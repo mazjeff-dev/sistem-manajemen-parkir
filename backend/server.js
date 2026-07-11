@@ -3,7 +3,7 @@ const cors = require("cors");
 require("dotenv").config();
 
 // Memanggil koneksi database
-require("./config/db");
+const db = require("./config/db");
 
 const app = express();
 const authRoutes = require("./routes/authRoutes");
