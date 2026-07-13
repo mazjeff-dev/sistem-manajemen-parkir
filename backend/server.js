@@ -9,12 +9,14 @@ const app = express();
 const authRoutes = require("./routes/authRoutes");
 const jenisRoutes = require("./routes/jenisRoutes");
 const kendaraanRoutes = require("./routes/kendaraanRoutes");
+const parkirRoutes = require("./routes/parkirRoutes");
 
 app.use(cors());
 app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/jenis", jenisRoutes);
 app.use("/api/kendaraan", kendaraanRoutes);
+app.use("/api/parkir", parkirRoutes);
 
 app.get("/", (req, res) => {
     res.send("API Sistem Manajemen Parkir Berjalan");
