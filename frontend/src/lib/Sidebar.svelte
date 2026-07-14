@@ -1,72 +1,109 @@
 <script>
     import { goto } from "$app/navigation";
+    import { page } from "$app/state";
     import {
         LayoutDashboard,
         Car,
         CarFront,
         SquareParking,
-        LogOut
+        LogOut,
+        ChevronLeft,
+        ChevronRight
     } from "lucide-svelte";
+
+    let collapsed = $state(
+        typeof localStorage !== "undefined" &&
+        localStorage.getItem("sidebarCollapsed") === "true"
+    );
+
+    function toggleCollapsed() {
+        collapsed = !collapsed;
+        localStorage.setItem("sidebarCollapsed", collapsed);
+    }
 
     function logout() {
         localStorage.removeItem("token");
         goto("/");
     }
+
+    const menu = [
+        { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
+        { label: "Jenis Kendaraan", icon: Car, path: "/jenis" },
+        { label: "Kendaraan", icon: CarFront, path: "/kendaraan" },
+        { label: "Parkir", icon: SquareParking, path: "/parkir" }
+    ];
+
+    let currentPath = $derived(page.url.pathname);
 </script>
 
-<aside class="w-64 h-screen bg-slate-900 text-white flex flex-col shadow-xl">
+<aside
+    class="sticky top-0 h-screen shrink-0 bg-slate-900 text-white flex flex-col shadow-xl transition-all duration-300 ease-in-out"
+    class:w-64={!collapsed}
+    class:w-20={collapsed}
+>
 
-    <div class="p-6 border-b border-slate-700">
-        <h1 class="text-2xl font-bold text-center">
-            🚗 Parkir App
-        </h1>
+    <div
+        class="p-4 border-b border-slate-700 flex items-center gap-3"
+        class:justify-center={collapsed}
+    >
+
+        <div class="shrink-0 w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-md shadow-blue-900/40">
+            <SquareParking size={20} strokeWidth={2.4}/>
+        </div>
+
+        {#if !collapsed}
+            <h1 class="text-xl font-bold whitespace-nowrap overflow-hidden">
+                Parkir App
+            </h1>
+        {/if}
+
     </div>
 
-    <nav class="flex-1 p-4 space-y-2">
+    <button
+        onclick={toggleCollapsed}
+        title={collapsed ? "Perluas sidebar" : "Ciutkan sidebar"}
+        class="flex items-center justify-center gap-2 mx-3 mt-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 transition text-slate-300"
+    >
+        {#if collapsed}
+            <ChevronRight size={18}/>
+        {:else}
+            <ChevronLeft size={18}/>
+            <span class="text-sm">Ciutkan</span>
+        {/if}
+    </button>
 
-        <button onclick={() => goto("/dashboard")}
-            class="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-blue-600 transition">
+    <nav class="flex-1 p-3 space-y-2 overflow-y-auto overflow-x-hidden">
 
-            <LayoutDashboard size={20}/>
-            Dashboard
+        {#each menu as item}
 
-        </button>
+            <button
+                onclick={() => goto(item.path)}
+                title={collapsed ? item.label : ""}
+                class="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-blue-600 transition whitespace-nowrap overflow-hidden"
+                class:justify-center={collapsed}
+                class:bg-blue-600={currentPath === item.path}
+            >
+                <item.icon size={20} class="shrink-0"/>
+                {#if !collapsed}
+                    <span>{item.label}</span>
+                {/if}
+            </button>
 
-        <button onclick={() => goto("/jenis")}
-            class="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-blue-600 transition">
-
-            <Car size={20}/>
-            Jenis Kendaraan
-
-        </button>
-
-        <button onclick={() => goto("/kendaraan")}
-            class="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-blue-600 transition">
-
-            <CarFront size={20}/>
-            Kendaraan
-
-        </button>
-
-        <button onclick={() => goto("/parkir")}
-            class="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-blue-600 transition">
-
-            <SquareParking size={20}/>
-            Parkir
-
-        </button>
+        {/each}
 
     </nav>
 
-    <div class="p-4">
+    <div class="p-3">
 
         <button
             onclick={logout}
-            class="w-full bg-red-500 hover:bg-red-600 rounded-lg py-3 flex items-center justify-center gap-2">
-
-            <LogOut size={20}/>
-            Logout
-
+            title={collapsed ? "Logout" : ""}
+            class="w-full bg-red-500 hover:bg-red-600 rounded-lg py-3 flex items-center justify-center gap-2 whitespace-nowrap overflow-hidden"
+        >
+            <LogOut size={20} class="shrink-0"/>
+            {#if !collapsed}
+                <span>Logout</span>
+            {/if}
         </button>
 
     </div>

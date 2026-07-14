@@ -1,6 +1,8 @@
 <script>
     import { onMount } from "svelte";
+    import { goto } from "$app/navigation";
     import BASE_URL from "../../services/api.js";
+    import { logout } from "../../stores/auth.js";
     import Sidebar from "../../lib/Sidebar.svelte";
     import Navbar from "../../lib/Navbar.svelte";
 
@@ -23,11 +25,22 @@
         try {
             const token = localStorage.getItem("token");
 
+            if (!token) {
+                goto("/");
+                return;
+            }
+
             const response = await fetch(`${BASE_URL}/dashboard`, {
                 headers: {
                     Authorization: `Bearer ${token}`
                 }
             });
+
+            if (response.status === 401) {
+                logout();
+                goto("/");
+                return;
+            }
 
             const data = await response.json();
 
@@ -57,7 +70,7 @@
 
                 <h1>Dashboard</h1>
 
-                <p>Selamat datang di Sistem Manajemen Parkir 🚗</p>
+                <p>Selamat datang di Sistem Manajemen Parkir</p>
 
             </div>
 

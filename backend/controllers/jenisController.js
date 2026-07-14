@@ -91,13 +91,15 @@ exports.updateJenis = (req, res) => {
 
 };
 
+
 // DELETE
 exports.deleteJenis = (req, res) => {
 
     const { id } = req.params;
 
+    // Cek apakah jenis masih digunakan
     db.query(
-        "DELETE FROM jenis_kendaraan WHERE id = ?",
+        "SELECT * FROM kendaraan WHERE jenis_id = ?",
         [id],
         (err, result) => {
 
@@ -107,15 +109,36 @@ exports.deleteJenis = (req, res) => {
                 });
             }
 
-            if (result.affectedRows === 0) {
-                return res.status(404).json({
-                    message: "Data tidak ditemukan"
+            if (result.length > 0) {
+                return res.status(400).json({
+                    message: "Jenis kendaraan masih digunakan oleh data kendaraan."
                 });
             }
 
-            res.json({
-                message: "Jenis kendaraan berhasil dihapus"
-            });
+            // Jika tidak digunakan, baru hapus
+            db.query(
+                "DELETE FROM jenis_kendaraan WHERE id = ?",
+                [id],
+                (err, result) => {
+
+                    if (err) {
+                        return res.status(500).json({
+                            message: err.message
+                        });
+                    }
+
+                    if (result.affectedRows === 0) {
+                        return res.status(404).json({
+                            message: "Data tidak ditemukan"
+                        });
+                    }
+
+                    res.json({
+                        message: "Jenis kendaraan berhasil dihapus"
+                    });
+
+                }
+            );
 
         }
     );
