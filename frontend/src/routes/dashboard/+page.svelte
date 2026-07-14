@@ -11,13 +11,13 @@
         LogOut
     } from "lucide-svelte";
 
-    let dashboard = {
+    let dashboard = $state({
         total_kendaraan: 0,
         total_parkir: 0,
         sedang_parkir: 0,
         sudah_keluar: 0,
         jenis: []
-    };
+    });
 
     async function loadDashboard() {
         try {

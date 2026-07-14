@@ -5,10 +5,15 @@
 
     import { Mail, Lock, LoaderCircle } from "lucide-svelte";
 
-    let email = "";
-    let password = "";
-    let error = "";
-    let loading = false;
+    let email = $state("");
+    let password = $state("");
+    let error = $state("");
+    let loading = $state(false);
+
+    function handleSubmit(event) {
+                event.preventDefault();
+                login();
+    }
 
     async function login() {
 
@@ -71,30 +76,24 @@
             Login sebagai Administrator
         </p>
 
-        <form on:submit|preventDefault={login}>
 
+        <form onsubmit={handleSubmit}>
             <div class="input-group">
-
-                <label>Email</label>
-
+                <label for="email">Email</label>
                 <div class="input-box">
-
                     <Mail size={18}/>
-
                     <input
                         type="email"
                         bind:value={email}
                         placeholder="Masukkan email"
                         required
                     />
-
                 </div>
-
             </div>
-
+            
             <div class="input-group">
 
-                <label>Password</label>
+                <label for="password">Password</label>
 
                 <div class="input-box">
 
@@ -125,8 +124,9 @@
 
                 {#if loading}
 
-                    <LoaderCircle size={18} class="spin"/>
-
+                    <span class="spin">
+                        <LoaderCircle size={18} />
+                    </span>
                     Login...
 
                 {:else}
