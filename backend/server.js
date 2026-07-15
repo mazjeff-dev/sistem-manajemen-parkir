@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
 require("dotenv").config();
 
 // Memanggil koneksi database
@@ -14,6 +15,11 @@ const dashboardRoutes = require("./routes/dashboardRoutes");
 
 app.use(cors());
 app.use(express.json());
+
+// Menyediakan akses statis ke file yang diupload (foto profile),
+// tanpa ini foto profile tidak akan pernah bisa dimuat di frontend
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
 app.use("/api/auth", authRoutes);
 app.use("/api/jenis", jenisRoutes);
 app.use("/api/kendaraan", kendaraanRoutes);
