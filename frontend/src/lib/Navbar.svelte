@@ -1,5 +1,35 @@
 <script>
+    import { onMount } from "svelte";
+    import { goto } from "$app/navigation";
     import { Bell, UserCircle2 } from "lucide-svelte";
+    import BASE_URL, { SERVER_URL } from "../services/api.js";
+
+    let nama = $state("Administrator");
+    let foto = $state(null);
+
+    async function loadProfile() {
+        try {
+            const token = localStorage.getItem("token");
+            if (!token) return;
+
+            const response = await fetch(`${BASE_URL}/profile`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            if (!response.ok) return;
+
+            const data = await response.json();
+            nama = data.nama || "Administrator";
+            foto = data.foto || null;
+
+        } catch (error) {
+            console.log(error);
+        }
+    }
+
+    onMount(() => {
+        loadProfile();
+    });
 </script>
 
 <nav class="bg-white shadow-md px-8 py-5 flex justify-between items-center">
@@ -20,14 +50,25 @@
 
         <Bell class="text-gray-500" size={22}/>
 
-        <div class="flex items-center gap-2">
+        <button
+            onclick={() => goto("/profile")}
+            class="flex items-center gap-2 hover:opacity-80 transition"
+        >
 
-            <UserCircle2 size={40} class="text-blue-600"/>
+            {#if foto}
+                <img
+                    src={`${SERVER_URL}/uploads/profile/${foto}`}
+                    alt="Foto profil"
+                    class="w-10 h-10 rounded-full object-cover border-2 border-blue-100"
+                />
+            {:else}
+                <UserCircle2 size={40} class="text-blue-600"/>
+            {/if}
 
-            <div>
+            <div class="text-left">
 
                 <h3 class="font-semibold">
-                    Administrator
+                    {nama}
                 </h3>
 
                 <p class="text-gray-500 text-sm">
@@ -36,7 +77,7 @@
 
             </div>
 
-        </div>
+        </button>
 
     </div>
 

@@ -5,12 +5,22 @@
     import { logout } from "../../stores/auth.js";
     import Sidebar from "../../lib/Sidebar.svelte";
     import Navbar from "../../lib/Navbar.svelte";
+    import WelcomeCard from "../../lib/WelcomeCard.svelte";
+    import DigitalClock from "../../lib/DigitalClock.svelte";
+    import MiniCalendar from "../../lib/MiniCalendar.svelte";
+    import RecentActivity from "../../lib/RecentActivity.svelte";
+    import Card from "../../lib/Card.svelte";
+    import BarChart from "../../lib/charts/BarChart.svelte";
+    import PieChart from "../../lib/charts/PieChart.svelte";
+    import LineChart from "../../lib/charts/LineChart.svelte";
 
     import {
         CarFront,
         SquareParking,
         CircleCheckBig,
-        LogOut
+        LogOut,
+        CalendarDays,
+        CalendarRange
     } from "lucide-svelte";
 
     let dashboard = $state({
@@ -21,33 +31,52 @@
         jenis: []
     });
 
+    let analytics = $state({
+        kendaraan_masuk_per_hari: [],
+        kendaraan_keluar_per_hari: [],
+        jenis_kendaraan: [],
+        ringkasan_hari_ini: 0,
+        ringkasan_bulan_ini: 0,
+        recent_activity: []
+    });
+
+    let loading = $state(true);
+
+    function handleUnauthorized() {
+        logout();
+        goto("/");
+    }
+
     async function loadDashboard() {
+        const token = localStorage.getItem("token");
+
+        if (!token) {
+            handleUnauthorized();
+            return;
+        }
+
         try {
-            const token = localStorage.getItem("token");
+            const [dashboardRes, analyticsRes] = await Promise.all([
+                fetch(`${BASE_URL}/dashboard`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                }),
+                fetch(`${BASE_URL}/dashboard/analytics`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                })
+            ]);
 
-            if (!token) {
-                goto("/");
+            if (dashboardRes.status === 401 || analyticsRes.status === 401) {
+                handleUnauthorized();
                 return;
             }
 
-            const response = await fetch(`${BASE_URL}/dashboard`, {
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
-            });
-
-            if (response.status === 401) {
-                logout();
-                goto("/");
-                return;
-            }
-
-            const data = await response.json();
-
-            dashboard = data;
+            dashboard = await dashboardRes.json();
+            analytics = await analyticsRes.json();
 
         } catch (error) {
             console.log(error);
+        } finally {
+            loading = false;
         }
     }
 
@@ -56,100 +85,113 @@
     });
 </script>
 
-<div class="container">
+<div class="flex min-h-screen bg-slate-100">
 
     <Sidebar />
 
-    <div class="content">
+    <div class="flex-1">
 
         <Navbar />
 
-        <div class="dashboard">
+        <div class="p-8 flex flex-col gap-6">
 
-            <div class="dashboard-header">
+            <WelcomeCard />
 
-                <h1>Dashboard</h1>
+            <!-- Widget: jam, kalender, ringkasan -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 widget-row">
 
-                <p>Selamat datang di Sistem Manajemen Parkir</p>
-
-            </div>
-
-            <div class="card blue">
-
-                <div>
-
-                    <h3>Total Kendaraan</h3>
-
-                    <h2>{dashboard.total_kendaraan}</h2>
-
+                <div class="widget-in" style="animation-delay:0ms">
+                    <DigitalClock />
                 </div>
 
-                <CarFront size="55"/>
-
-            </div>
-
-            <div class="card green">
-
-                <div>
-
-                    <h3>Total Parkir</h3>
-
-                    <h2>{dashboard.total_parkir}</h2>
-
+                <div class="widget-in" style="animation-delay:80ms">
+                    <MiniCalendar />
                 </div>
 
-                <SquareParking size="55"/>
+                <Card
+                    title="Kendaraan Hari Ini"
+                    value={analytics.ringkasan_hari_ini}
+                    icon={CalendarDays}
+                    variant="white"
+                    delay={160}
+                />
+
+                <Card
+                    title="Kendaraan Bulan Ini"
+                    value={analytics.ringkasan_bulan_ini}
+                    icon={CalendarRange}
+                    variant="white"
+                    delay={240}
+                />
 
             </div>
 
-            <div class="card orange">
+            <!-- Ringkasan utama -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
 
-                <div>
+                <Card
+                    title="Total Kendaraan"
+                    value={dashboard.total_kendaraan}
+                    icon={CarFront}
+                    variant="blue"
+                    delay={0}
+                />
 
-                    <h3>Sedang Parkir</h3>
+                <Card
+                    title="Total Parkir"
+                    value={dashboard.total_parkir}
+                    icon={SquareParking}
+                    variant="green"
+                    delay={80}
+                />
 
-                    <h2>{dashboard.sedang_parkir}</h2>
+                <Card
+                    title="Sedang Parkir"
+                    value={dashboard.sedang_parkir}
+                    icon={CircleCheckBig}
+                    variant="orange"
+                    delay={160}
+                />
 
+                <Card
+                    title="Sudah Keluar"
+                    value={dashboard.sudah_keluar}
+                    icon={LogOut}
+                    variant="red"
+                    delay={240}
+                />
+
+            </div>
+
+            <!-- Chart -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                <div class="rounded-2xl p-6 bg-white shadow-md fade-in-up" style="animation-delay:100ms">
+                    <BarChart
+                        title="Kendaraan Masuk per Hari (7 Hari Terakhir)"
+                        data={analytics.kendaraan_masuk_per_hari}
+                    />
                 </div>
 
-                <CircleCheckBig size="55"/>
-
-            </div>
-
-            <div class="card red">
-
-                <div>
-
-                    <h3>Sudah Keluar</h3>
-
-                    <h2>{dashboard.sudah_keluar}</h2>
-
+                <div class="rounded-2xl p-6 bg-white shadow-md fade-in-up" style="animation-delay:180ms">
+                    <PieChart
+                        title="Jenis Kendaraan"
+                        data={analytics.jenis_kendaraan}
+                    />
                 </div>
 
-                <LogOut size="55"/>
-
             </div>
 
-            <div class="card jenis">
+            <div class="rounded-2xl p-6 bg-white shadow-md fade-in-up" style="animation-delay:260ms">
+                <LineChart
+                    title="Statistik Parkir (Masuk vs Keluar)"
+                    masuk={analytics.kendaraan_masuk_per_hari}
+                    keluar={analytics.kendaraan_keluar_per_hari}
+                />
+            </div>
 
-                <h3>Jenis Kendaraan</h3>
-
-                {#each dashboard.jenis as item}
-
-                    <div class="jenis-item">
-
-                        <span>{item.nama_jenis}</span>
-
-                        <span class="badge">
-
-                            {item.jumlah}
-
-                        </span>
-
-                    </div>
-
-                {/each}
-
+            <div class="fade-in-up" style="animation-delay:340ms">
+                <RecentActivity data={analytics.recent_activity} />
             </div>
 
         </div>
@@ -159,233 +201,24 @@
 </div>
 
 <style>
-
-.container{
-    display:flex;
-    min-height:100vh;
-    background:#eef2f7;
-}
-
-.content{
-    flex:1;
-}
-
-.dashboard{
-
-    padding:35px;
-
-    display:grid;
-
-    grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
-
-    gap:22px;
-
-    animation:fadeDashboard .8s ease;
-
-}
-
-.dashboard-header{
-
-    grid-column:1/-1;
-
-}
-
-.dashboard-header h1{
-
-    font-size:34px;
-
-    color:#1e293b;
-
-}
-
-.dashboard-header p{
-
-    color:#64748b;
-
-    margin-top:8px;
-
-}
-
-.card{
-
-    border-radius:18px;
-
-    padding:25px;
-
-    color:white;
-
-    display:flex;
-
-    justify-content:space-between;
-
-    align-items:center;
-
-    box-shadow:0 10px 25px rgba(0,0,0,.08);
-
-    transition:.35s;
-
+.widget-in{
     opacity:0;
-
-    animation:slideFromRight .7s forwards;
-
+    animation: widgetIn .5s ease forwards;
 }
 
-.card:hover{
-
-    transform:translateY(-8px) scale(1.02);
-
+.fade-in-up{
+    opacity:0;
+    animation: widgetIn .5s ease forwards;
 }
 
-.card:nth-child(2){
-
-    animation-delay:.2s;
-
-}
-
-.card:nth-child(3){
-
-    animation-delay:.4s;
-
-}
-
-.card:nth-child(4){
-
-    animation-delay:.6s;
-
-}
-
-.card:nth-child(5){
-
-    animation-delay:.8s;
-
-}
-
-.card h3{
-
-    font-size:15px;
-
-    opacity:.9;
-
-}
-
-.card h2{
-
-    font-size:48px;
-
-    margin-top:12px;
-
-    font-weight:bold;
-
-}
-
-.blue{
-
-    background:linear-gradient(135deg,#2563eb,#3b82f6);
-
-}
-
-.green{
-
-    background:linear-gradient(135deg,#16a34a,#22c55e);
-
-}
-
-.orange{
-
-    background:linear-gradient(135deg,#ea580c,#fb923c);
-
-}
-
-.red{
-
-    background:linear-gradient(135deg,#dc2626,#ef4444);
-
-}
-
-.jenis{
-
-    grid-column:1/-1;
-
-    background:white;
-
-    color:#1e293b;
-
-    display:block;
-
-}
-
-.jenis h3{
-
-    font-size:22px;
-
-    margin-bottom:18px;
-
-    color:#0f172a;
-
-}
-
-.jenis-item{
-
-    display:flex;
-
-    justify-content:space-between;
-
-    align-items:center;
-
-    padding:14px 0;
-
-    border-bottom:1px solid #e5e7eb;
-
-}
-
-.badge{
-
-    background:#2563eb;
-
-    color:white;
-
-    padding:5px 14px;
-
-    border-radius:20px;
-
-    font-weight:bold;
-
-}
-
-@keyframes slideFromRight{
-
+@keyframes widgetIn{
     from{
-
         opacity:0;
-
-        transform:translateX(70px);
-
+        transform: translateY(14px);
     }
-
     to{
-
         opacity:1;
-
-        transform:translateX(0);
-
+        transform: translateY(0);
     }
-
 }
-
-@keyframes fadeDashboard{
-
-    from{
-
-        opacity:0;
-
-    }
-
-    to{
-
-        opacity:1;
-
-    }
-
-}
-
 </style>

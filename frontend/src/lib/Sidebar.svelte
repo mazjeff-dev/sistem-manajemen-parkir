@@ -6,6 +6,7 @@
         Car,
         CarFront,
         SquareParking,
+        UserCircle2,
         LogOut,
         ChevronLeft,
         ChevronRight
@@ -30,7 +31,8 @@
         { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
         { label: "Jenis Kendaraan", icon: Car, path: "/jenis" },
         { label: "Kendaraan", icon: CarFront, path: "/kendaraan" },
-        { label: "Parkir", icon: SquareParking, path: "/parkir" }
+        { label: "Parkir", icon: SquareParking, path: "/parkir" },
+        { label: "Profil", icon: UserCircle2, path: "/profile" }
     ];
 
     let currentPath = $derived(page.url.pathname);
@@ -74,14 +76,15 @@
 
     <nav class="flex-1 p-3 space-y-2 overflow-y-auto overflow-x-hidden">
 
-        {#each menu as item}
+        {#each menu as item, index}
 
             <button
                 onclick={() => goto(item.path)}
                 title={collapsed ? item.label : ""}
-                class="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-blue-600 transition whitespace-nowrap overflow-hidden"
+                class="menu-item w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-blue-600 transition whitespace-nowrap overflow-hidden"
                 class:justify-center={collapsed}
                 class:bg-blue-600={currentPath === item.path}
+                style="animation-delay:{index * 60}ms"
             >
                 <item.icon size={20} class="shrink-0"/>
                 {#if !collapsed}
@@ -109,3 +112,36 @@
     </div>
 
 </aside>
+
+<style>
+aside{
+    animation: sidebarSlide .5s ease;
+}
+
+.menu-item{
+    opacity:0;
+    animation: menuItemIn .4s ease forwards;
+}
+
+@keyframes sidebarSlide{
+    from{
+        opacity:0;
+        transform: translateX(-24px);
+    }
+    to{
+        opacity:1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes menuItemIn{
+    from{
+        opacity:0;
+        transform: translateX(-10px);
+    }
+    to{
+        opacity:1;
+        transform: translateX(0);
+    }
+}
+</style>
