@@ -3,8 +3,7 @@
     import { goto } from "$app/navigation";
     import BASE_URL, { SERVER_URL } from "../../services/api.js";
     import { logout } from "../../stores/auth.js";
-    import Sidebar from "../../lib/Sidebar.svelte";
-    import Navbar from "../../lib/Navbar.svelte";
+    import { profileInfo } from "../../stores/profile.js";
     import { UserCircle2, Camera, Save, KeyRound, Loader2 } from "lucide-svelte";
 
     let profile = $state({
@@ -80,6 +79,11 @@
             profile = data;
             namaForm = data.nama;
             emailForm = data.email;
+
+            profileInfo.set({
+                nama: data.nama || "Administrator",
+                foto: data.foto || null
+            });
 
         } catch (err) {
             console.error(err);
@@ -242,20 +246,12 @@
     });
 </script>
 
-<div class="flex min-h-screen bg-slate-100">
+<div class="p-8 flex flex-col gap-6 profile-page">
 
-    <Sidebar />
-
-    <div class="flex-1">
-
-        <Navbar />
-
-        <div class="p-8 flex flex-col gap-6">
-
-            <div>
-                <h1 class="text-3xl font-bold text-slate-800">Profil Saya</h1>
-                <p class="text-slate-500 mt-1">Kelola informasi akun dan keamanan login kamu</p>
-            </div>
+    <div class="header-in">
+        <h1 class="text-3xl font-bold text-slate-800">Profil Saya</h1>
+        <p class="text-slate-500 mt-1">Kelola informasi akun dan keamanan login kamu</p>
+    </div>
 
             {#if loadingProfile}
                 <div class="flex items-center gap-2 text-slate-500">
@@ -267,9 +263,9 @@
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
                     <!-- Kolom kiri: Foto + Informasi Akun -->
-                    <div class="flex flex-col gap-6">
+                    <div class="flex flex-col gap-6 col-in" style="animation-delay:80ms">
 
-                        <div class="rounded-2xl p-6 bg-white shadow-md flex flex-col items-center text-center">
+                        <div class="rounded-2xl p-6 bg-white shadow-md flex flex-col items-center text-center avatar-card">
 
                             <div class="relative">
                                 {#if previewFoto}
@@ -347,7 +343,7 @@
                     </div>
 
                     <!-- Kolom kanan: Edit Profile + Ganti Password -->
-                    <div class="lg:col-span-2 flex flex-col gap-6">
+                    <div class="lg:col-span-2 flex flex-col gap-6 col-in" style="animation-delay:160ms">
 
                         <div class="rounded-2xl p-6 bg-white shadow-md">
                             <h3 class="text-slate-800 font-semibold text-lg mb-4">Edit Profile</h3>
@@ -443,10 +439,6 @@
 
             {/if}
 
-        </div>
-
-    </div>
-
 </div>
 
 {#if toast.show}
@@ -458,3 +450,46 @@
         {toast.message}
     </div>
 {/if}
+
+<style>
+.header-in{
+    opacity:0;
+    animation: profileFadeDown .5s ease forwards;
+}
+
+.avatar-card{
+    transition: transform .25s ease, box-shadow .25s ease;
+}
+
+.avatar-card:hover{
+    transform: translateY(-4px);
+    box-shadow: 0 14px 28px rgba(0,0,0,.1);
+}
+
+.col-in{
+    opacity:0;
+    animation: profileFadeUp .5s ease forwards;
+}
+
+@keyframes profileFadeDown{
+    from{
+        opacity:0;
+        transform: translateY(-14px);
+    }
+    to{
+        opacity:1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes profileFadeUp{
+    from{
+        opacity:0;
+        transform: translateY(16px);
+    }
+    to{
+        opacity:1;
+        transform: translateY(0);
+    }
+}
+</style>

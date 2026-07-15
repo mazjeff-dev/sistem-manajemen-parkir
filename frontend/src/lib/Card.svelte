@@ -24,7 +24,7 @@
         <h3 class="text-sm {variant === 'white' ? 'text-slate-500' : 'opacity-90'}">
             {title}
         </h3>
-        <p class="text-3xl font-bold mt-2">
+        <p class="text-5xl font-bold mt-2">
             {value}
         </p>
     </div>

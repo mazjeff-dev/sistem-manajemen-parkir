@@ -3,13 +3,12 @@
     import { goto } from "$app/navigation";
     import BASE_URL from "../../services/api.js";
     import { logout } from "../../stores/auth.js";
-    import Sidebar from "../../lib/Sidebar.svelte";
-    import Navbar from "../../lib/Navbar.svelte";
     import WelcomeCard from "../../lib/WelcomeCard.svelte";
     import DigitalClock from "../../lib/DigitalClock.svelte";
     import MiniCalendar from "../../lib/MiniCalendar.svelte";
     import RecentActivity from "../../lib/RecentActivity.svelte";
     import Card from "../../lib/Card.svelte";
+    import QuoteCard from "../../lib/QuoteCard.svelte";
     import BarChart from "../../lib/charts/BarChart.svelte";
     import PieChart from "../../lib/charts/PieChart.svelte";
     import LineChart from "../../lib/charts/LineChart.svelte";
@@ -85,28 +84,21 @@
     });
 </script>
 
-<div class="flex min-h-screen bg-slate-100">
+<div class="p-8 flex flex-col gap-6">
 
-    <Sidebar />
+    <WelcomeCard />
 
-    <div class="flex-1">
+    <!-- Widget: jam, kata-kata, kalender, ringkasan -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 widget-row">
 
-        <Navbar />
+        <div class="widget-in flex flex-col gap-6" style="animation-delay:0ms">
+            <DigitalClock />
+            <QuoteCard />
+        </div>
 
-        <div class="p-8 flex flex-col gap-6">
-
-            <WelcomeCard />
-
-            <!-- Widget: jam, kalender, ringkasan -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 widget-row">
-
-                <div class="widget-in" style="animation-delay:0ms">
-                    <DigitalClock />
-                </div>
-
-                <div class="widget-in" style="animation-delay:80ms">
-                    <MiniCalendar />
-                </div>
+        <div class="widget-in" style="animation-delay:80ms">
+            <MiniCalendar />
+        </div>
 
                 <Card
                     title="Kendaraan Hari Ini"
@@ -190,12 +182,8 @@
                 />
             </div>
 
-            <div class="fade-in-up" style="animation-delay:340ms">
-                <RecentActivity data={analytics.recent_activity} />
-            </div>
-
-        </div>
-
+    <div class="fade-in-up" style="animation-delay:340ms">
+        <RecentActivity data={analytics.recent_activity} />
     </div>
 
 </div>

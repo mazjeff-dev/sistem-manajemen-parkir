@@ -4,8 +4,6 @@ import { onMount } from "svelte";
 import { goto } from "$app/navigation";
 import BASE_URL from "../../services/api.js";
 import { logout } from "../../stores/auth.js";
-import Sidebar from "../../lib/Sidebar.svelte";
-import Navbar from "../../lib/Navbar.svelte";
 
 import { Plus, LogOut, Trash2 } from "lucide-svelte";
 
@@ -44,7 +42,7 @@ let toast = $state({
     message: "",
     type: "success"
 });
-let loading = $state(false);
+let loading = $state(true);
 
 function handleUnauthorized() {
     logout();
@@ -329,17 +327,9 @@ onMount(() => {
 
 </script>
 
-<div class="container">
+<div class="page">
 
-    <Sidebar/>
-
-    <div class="content">
-
-        <Navbar/>
-
-        <div class="page">
-
-            <h1>Parkir</h1>
+    <h1>Parkir</h1>
 
             <p class="total-data">
                 Total Data :
@@ -566,23 +556,9 @@ onMount(() => {
 
             {/if}
 
-        </div>
-
-    </div>
-
 </div>
 
 <style>
-
-.container{
-    display:flex;
-    min-height:100vh;
-    background:#eef2f7;
-}
-
-.content{
-    flex:1;
-}
 
 .page{
     padding:35px;
@@ -591,6 +567,9 @@ onMount(() => {
 
 .page h1{
     margin-bottom:20px;
+    font-size:36px;
+    line-height:1.2;
+    color:#0f172a;
 }
 
 button{

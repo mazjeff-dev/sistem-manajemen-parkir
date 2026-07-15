@@ -4,8 +4,6 @@ import { onMount } from "svelte";
 import { goto } from "$app/navigation";
 import BASE_URL from "../../services/api.js";
 import { logout } from "../../stores/auth.js";
-import Sidebar from "../../lib/Sidebar.svelte";
-import Navbar from "../../lib/Navbar.svelte";
 
 import { Plus, Pencil, Trash2, Search } from "lucide-svelte";
 
@@ -32,7 +30,7 @@ let toast = $state({
     message: "",
     type: "success"
 });
-let loading = $state(false);
+let loading = $state(true);
 
 function handleUnauthorized() {
     logout();
@@ -299,20 +297,16 @@ function showToast(message, type = "success") {
 
 }
 
+onMount(() => {
+    loadJenis();
+});
+
 
 </script>
 
-<div class="container">
+<div class="page">
 
-    <Sidebar/>
-
-    <div class="content">
-
-        <Navbar/>
-
-        <div class="page">
-
-            <h1>Jenis Kendaraan</h1>
+    <h1>Jenis Kendaraan</h1>
 
             <p class="total-data">
 
@@ -388,18 +382,12 @@ function showToast(message, type = "success") {
 
                     <td>
 
-                        <button
-                            class="edit"
-                            onclick={() => bukaEdit(item)}
-                        >
+                        <button class="edit" onclick={() => bukaEdit(item)}>
                             <Pencil size={16}/>
                             Edit
                         </button>
 
-                        <button
-                            class="delete"
-                            onclick={() => bukaDelete(item)}
-                        >
+                        <button class="delete" onclick={() => bukaDelete(item)}>
                             <Trash2 size={16}/>
                             Delete
                         </button>
@@ -534,30 +522,10 @@ function showToast(message, type = "success") {
 
             {/if}
 
-        </div>
-
-    </div>
-
 </div>
 
 
 <style>
-
-.container{
-
-    display:flex;
-
-    min-height:100vh;
-
-    background:#eef2f7;
-
-}
-
-.content{
-
-    flex:1;
-
-}
 
 .page{
 
@@ -570,6 +538,12 @@ function showToast(message, type = "success") {
 .page h1{
 
     margin-bottom:20px;
+
+    font-size:36px;
+
+    line-height:1.2;
+
+    color:#0f172a;
 
 }
 
