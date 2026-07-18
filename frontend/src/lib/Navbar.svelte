@@ -15,6 +15,7 @@
         "/jenis": "Manajemen Jenis Kendaraan",
         "/kendaraan": "Manajemen Data Kendaraan",
         "/parkir": "Manajemen Data Parkir",
+        "/laporan": "Laporan Parkir",
         "/profile": "Pengaturan Profil"
     };
 

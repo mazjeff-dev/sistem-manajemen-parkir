@@ -3,6 +3,7 @@
     import { goto } from "$app/navigation";
     import BASE_URL from "../../services/api.js";
     import { logout } from "../../stores/auth.js";
+    import { profileInfo } from "../../stores/profile.js";
     import WelcomeCard from "../../lib/WelcomeCard.svelte";
     import DigitalClock from "../../lib/DigitalClock.svelte";
     import MiniCalendar from "../../lib/MiniCalendar.svelte";
@@ -86,7 +87,7 @@
 
 <div class="p-8 flex flex-col gap-6">
 
-    <WelcomeCard />
+    <WelcomeCard nama={$profileInfo.nama} />
 
     <!-- Widget: jam, kata-kata, kalender, ringkasan -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 widget-row">

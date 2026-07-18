@@ -6,6 +6,7 @@
         Car,
         CarFront,
         SquareParking,
+        FileText,
         UserCircle2,
         LogOut,
         ChevronLeft,
@@ -32,6 +33,7 @@
         { label: "Jenis Kendaraan", icon: Car, path: "/jenis" },
         { label: "Kendaraan", icon: CarFront, path: "/kendaraan" },
         { label: "Parkir", icon: SquareParking, path: "/parkir" },
+        { label: "Laporan", icon: FileText, path: "/laporan" },
         { label: "Profil", icon: UserCircle2, path: "/profile" }
     ];
 

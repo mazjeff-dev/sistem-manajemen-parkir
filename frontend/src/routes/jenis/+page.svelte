@@ -705,6 +705,10 @@ tr:hover{
 
     margin-right:8px;
 
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+
 }
 
 .delete{
@@ -712,6 +716,10 @@ tr:hover{
     background:#dc2626;
 
     color:white;
+
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
 
 }
 

@@ -82,7 +82,7 @@
                 <SquareParking size={38} strokeWidth={2.2}/>
             </button>
 
-            <h1>Sistem Parkir</h1>
+            <h1>Parkir app</h1>
 
             <p class="subtitle">
                 pencet logo dan lihat tutorial
@@ -154,7 +154,7 @@
 
             <p class="footer">
 
-                © 2026 Sistem Manajemen Parkir
+                Sistem Manajemen Parkir, project klompok 14
 
             </p>
 
@@ -167,7 +167,7 @@
                     <X size={18} />
                 </button>
 
-                <h2>Cara Menggunakan Sistem Parkir</h2>
+                <h2>Cara Menggunakan parkir app</h2>
 
                 <ol>
                     <li>
