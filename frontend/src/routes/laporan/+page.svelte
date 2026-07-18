@@ -14,7 +14,10 @@ import {
     Car,
     ChevronLeft,
     ChevronRight,
-    FileText
+    FileText,
+    FileDown,
+    FileSpreadsheet,
+    Printer
 } from "lucide-svelte";
 
 // ===========================
@@ -36,6 +39,17 @@ const itemsPerPage = 8;
 // Modal detail
 let showDetailModal = $state(false);
 let selectedItem = $state(null);
+
+// Export
+let exportingPdf = $state(false);
+let exportingExcel = $state(false);
+
+// Toast notification
+let toast = $state({
+    show: false,
+    message: "",
+    type: "success"
+});
 
 // ===========================
 // Derived
@@ -220,6 +234,208 @@ function formatDurasi(menit) {
 
 }
 
+// ===========================
+// Toast
+// ===========================
+
+function showToast(message, type = "success") {
+
+    toast.show = true;
+    toast.message = message;
+    toast.type = type;
+
+    setTimeout(() => {
+        toast.show = false;
+    }, 3000);
+
+}
+
+// ===========================
+// Export & Print
+// ===========================
+
+// Teks periode laporan, mengikuti filter tanggal yang sedang aktif
+function periodeText() {
+    if (filterStart && filterEnd) return `${filterStart} s/d ${filterEnd}`;
+    if (filterStart) return `Mulai ${filterStart}`;
+    if (filterEnd) return `Sampai ${filterEnd}`;
+    return "Semua Data";
+}
+
+// Baris tabel laporan (data yang sedang ditampilkan/hasil filter & search)
+function buildRows() {
+    return filteredLaporan.map((item, index) => {
+        const badge = statusBadge(item.status);
+        return [
+            index + 1,
+            item.plat_nomor || "-",
+            item.nama_jenis || "-",
+            item.nama_pemilik || "-",
+            formatWaktu(item.waktu_masuk),
+            formatWaktu(item.waktu_keluar),
+            formatDurasi(item.durasi_menit),
+            formatBiaya(item.biaya),
+            badge.label
+        ];
+    });
+}
+
+async function exportPDF() {
+
+    if (filteredLaporan.length === 0) {
+        showToast("Tidak ada data untuk diekspor", "error");
+        return;
+    }
+
+    exportingPdf = true;
+
+    try {
+
+        const { default: jsPDF } = await import("jspdf");
+        const { default: autoTable } = await import("jspdf-autotable");
+
+        const doc = new jsPDF({ orientation: "landscape" });
+        const tanggalLaporan = new Date().toLocaleDateString("id-ID", {
+            day: "2-digit",
+            month: "long",
+            year: "numeric"
+        });
+
+        doc.setFontSize(16);
+        doc.setFont(undefined, "bold");
+        doc.text("SISTEM MANAJEMEN PARKIR", 14, 15);
+
+        doc.setFontSize(12);
+        doc.text("LAPORAN PARKIR", 14, 22);
+
+        doc.setFontSize(10);
+        doc.setFont(undefined, "normal");
+        doc.text(`Tanggal Laporan : ${tanggalLaporan}`, 14, 29);
+        doc.text(`Periode Laporan : ${periodeText()}`, 14, 34);
+        doc.text(`Total Data : ${filteredLaporan.length}`, 14, 39);
+
+        autoTable(doc, {
+            startY: 44,
+            head: [[
+                "No", "Plat Nomor", "Jenis Kendaraan", "Nama Pemilik",
+                "Jam Masuk", "Jam Keluar", "Durasi", "Biaya", "Status"
+            ]],
+            body: buildRows(),
+            theme: "grid",
+            headStyles: { fillColor: [37, 99, 235], textColor: 255, fontStyle: "bold" },
+            styles: { fontSize: 8, cellPadding: 3 }
+        });
+
+        const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY : 44;
+
+        doc.setFontSize(8);
+        doc.setTextColor(120);
+        doc.text(
+            `Dicetak oleh Sistem Manajemen Parkir - ${tanggalLaporan}`,
+            14,
+            Math.min(finalY + 10, doc.internal.pageSize.getHeight() - 10)
+        );
+
+        doc.save("laporan-parkir.pdf");
+        showToast("PDF berhasil diunduh");
+
+    } catch (err) {
+
+        console.error(err);
+        showToast("Gagal membuat PDF", "error");
+
+    } finally {
+
+        exportingPdf = false;
+
+    }
+
+}
+
+async function exportExcel() {
+
+    if (filteredLaporan.length === 0) {
+        showToast("Tidak ada data untuk diekspor", "error");
+        return;
+    }
+
+    exportingExcel = true;
+
+    try {
+
+        const XLSX = await import("xlsx");
+
+        const tanggalLaporan = new Date().toLocaleDateString("id-ID", {
+            day: "2-digit",
+            month: "long",
+            year: "numeric"
+        });
+
+        const sheetData = [
+            ["SISTEM MANAJEMEN PARKIR"],
+            ["LAPORAN PARKIR"],
+            [`Tanggal Laporan : ${tanggalLaporan}`],
+            [`Periode Laporan : ${periodeText()}`],
+            [`Total Data : ${filteredLaporan.length}`],
+            [],
+            [
+                "No", "Plat Nomor", "Jenis Kendaraan", "Nama Pemilik",
+                "Jam Masuk", "Jam Keluar", "Durasi", "Biaya", "Status"
+            ],
+            ...buildRows()
+        ];
+
+        const ws = XLSX.utils.aoa_to_sheet(sheetData);
+
+        ws["!cols"] = [
+            { wch: 5 }, { wch: 14 }, { wch: 16 }, { wch: 20 },
+            { wch: 18 }, { wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 12 }
+        ];
+
+        ws["!merges"] = [
+            { s: { r: 0, c: 0 }, e: { r: 0, c: 8 } },
+            { s: { r: 1, c: 0 }, e: { r: 1, c: 8 } }
+        ];
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Laporan Parkir");
+
+        XLSX.writeFile(wb, "laporan-parkir.xlsx");
+        showToast("Excel berhasil diunduh");
+
+    } catch (err) {
+
+        console.error(err);
+        showToast("Gagal membuat file Excel", "error");
+
+    } finally {
+
+        exportingExcel = false;
+
+    }
+
+}
+
+function printLaporan() {
+
+    if (filteredLaporan.length === 0) {
+        showToast("Tidak ada data untuk diekspor", "error");
+        return;
+    }
+
+    try {
+
+        window.print();
+
+    } catch (err) {
+
+        console.error(err);
+        showToast("Gagal mencetak laporan", "error");
+
+    }
+
+}
+
 onMount(() => {
     loadLaporan();
 });
@@ -284,6 +500,25 @@ onMount(() => {
                 placeholder="Cari plat nomor, pemilik, atau jenis..."
             />
         </div>
+
+    </div>
+
+    <div class="export-actions">
+
+        <button class="btn-export pdf" onclick={exportPDF} disabled={exportingPdf}>
+            <FileDown size={16}/>
+            {exportingPdf ? "Exporting..." : "Export PDF"}
+        </button>
+
+        <button class="btn-export excel" onclick={exportExcel} disabled={exportingExcel}>
+            <FileSpreadsheet size={16}/>
+            {exportingExcel ? "Exporting..." : "Export Excel"}
+        </button>
+
+        <button class="btn-export print" onclick={printLaporan}>
+            <Printer size={16}/>
+            Print
+        </button>
 
     </div>
 
@@ -409,6 +644,60 @@ onMount(() => {
         {/if}
 
     </div>
+
+    <!-- Bagian ini hanya tampil saat print (lihat @media print), berisi
+         judul, periode, total data, dan seluruh data hasil filter/search -->
+    <div class="print-section">
+
+        <div class="print-header">
+            <h1>SISTEM MANAJEMEN PARKIR</h1>
+            <h2>LAPORAN PARKIR</h2>
+        </div>
+
+        <div class="print-meta">
+            <p><b>Periode Laporan:</b> {periodeText()}</p>
+            <p><b>Total Data:</b> {filteredLaporan.length}</p>
+        </div>
+
+        <table class="print-table">
+            <thead>
+                <tr>
+                    <th>No</th>
+                    <th>Plat Nomor</th>
+                    <th>Jenis Kendaraan</th>
+                    <th>Nama Pemilik</th>
+                    <th>Jam Masuk</th>
+                    <th>Jam Keluar</th>
+                    <th>Durasi</th>
+                    <th>Biaya</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {#each filteredLaporan as item, index (item.id)}
+                    {@const badge = statusBadge(item.status)}
+                    <tr>
+                        <td>{index + 1}</td>
+                        <td>{item.plat_nomor}</td>
+                        <td>{item.nama_jenis}</td>
+                        <td>{item.nama_pemilik}</td>
+                        <td>{formatWaktu(item.waktu_masuk)}</td>
+                        <td>{formatWaktu(item.waktu_keluar)}</td>
+                        <td>{formatDurasi(item.durasi_menit)}</td>
+                        <td>{formatBiaya(item.biaya)}</td>
+                        <td>{badge.label}</td>
+                    </tr>
+                {/each}
+            </tbody>
+        </table>
+
+    </div>
+
+    {#if toast.show}
+        <div class="toast {toast.type}">
+            {toast.message}
+        </div>
+    {/if}
 
 </div>
 
@@ -777,6 +1066,185 @@ tbody tr:hover{
 }
 
 /* ===========================
+   Export & Print buttons
+=========================== */
+
+.export-actions{
+    display:flex;
+    gap:10px;
+    margin-bottom:16px;
+    flex-wrap:wrap;
+}
+
+.btn-export{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:11px 18px;
+    border:none;
+    border-radius:10px;
+    cursor:pointer;
+    font-size:14px;
+    font-weight:600;
+    color:white;
+    transition:transform .2s, background .2s, box-shadow .2s, opacity .2s;
+}
+
+.btn-export:disabled{
+    opacity:.6;
+    cursor:not-allowed;
+    transform:none;
+    box-shadow:none;
+}
+
+.btn-export.pdf{
+    background:#dc2626;
+}
+
+.btn-export.pdf:hover:not(:disabled){
+    background:#b91c1c;
+    transform:translateY(-2px);
+    box-shadow:0 8px 16px rgba(220,38,38,.25);
+}
+
+.btn-export.excel{
+    background:#16a34a;
+}
+
+.btn-export.excel:hover:not(:disabled){
+    background:#15803d;
+    transform:translateY(-2px);
+    box-shadow:0 8px 16px rgba(22,163,74,.25);
+}
+
+.btn-export.print{
+    background:#2563eb;
+}
+
+.btn-export.print:hover:not(:disabled){
+    background:#1d4ed8;
+    transform:translateY(-2px);
+    box-shadow:0 8px 16px rgba(37,99,235,.25);
+}
+
+/* ===========================
+   Toast
+=========================== */
+
+.toast{
+    position:fixed;
+    top:25px;
+    right:25px;
+    padding:16px 22px;
+    border-radius:12px;
+    color:white;
+    font-weight:600;
+    animation:slideToast .35s ease;
+    z-index:9999;
+    box-shadow:0 10px 30px rgba(0,0,0,.25);
+}
+
+.toast.success{
+    background:#16a34a;
+}
+
+.toast.error{
+    background:#dc2626;
+}
+
+@keyframes slideToast{
+    from{
+        opacity:0;
+        transform:translateX(80px);
+    }
+    to{
+        opacity:1;
+        transform:translateX(0);
+    }
+}
+
+/* ===========================
+   Print-only report section
+=========================== */
+
+.print-section{
+    display:none;
+}
+
+@media print{
+
+    :global(aside),
+    :global(nav){
+        display:none !important;
+    }
+
+    .page-header,
+    .filter-card,
+    .export-actions,
+    .toolbar,
+    .table-card,
+    .toast{
+        display:none !important;
+    }
+
+    .page{
+        padding:0;
+    }
+
+    .print-section{
+        display:block !important;
+    }
+
+    .print-header{
+        text-align:center;
+        margin-bottom:10px;
+    }
+
+    .print-header h1{
+        font-size:18px;
+        margin-bottom:2px;
+        color:#000;
+    }
+
+    .print-header h2{
+        font-size:14px;
+        font-weight:600;
+        color:#333;
+    }
+
+    .print-meta{
+        margin:14px 0;
+        font-size:12px;
+        color:#000;
+    }
+
+    .print-meta p{
+        margin-bottom:4px;
+    }
+
+    .print-table{
+        width:100%;
+        border-collapse:collapse;
+        font-size:11px;
+        color:#000;
+    }
+
+    .print-table th,
+    .print-table td{
+        border:1px solid #333;
+        padding:6px 8px;
+        text-align:left;
+    }
+
+    .print-table th{
+        background:#eee !important;
+        -webkit-print-color-adjust:exact;
+        print-color-adjust:exact;
+    }
+
+}
+
+/* ===========================
    Skeleton Loading
 =========================== */
 
@@ -1081,6 +1549,15 @@ tbody tr:hover{
     }
 
     .btn-filter, .btn-reset{
+        justify-content:center;
+        width:100%;
+    }
+
+    .export-actions{
+        flex-direction:column;
+    }
+
+    .btn-export{
         justify-content:center;
         width:100%;
     }
