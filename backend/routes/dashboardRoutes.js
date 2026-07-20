@@ -10,4 +10,7 @@ router.get("/", verifyToken, dashboardController.dashboard);
 // Dashboard Analytics (chart, ringkasan, recent activity)
 router.get("/analytics", verifyToken, dashboardController.analytics);
 
+// Dashboard Pendapatan (revenue hari ini/bulan ini/tahun ini)
+router.get("/revenue", verifyToken, dashboardController.revenue);
+
 module.exports = router;

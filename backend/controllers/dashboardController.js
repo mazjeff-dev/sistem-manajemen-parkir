@@ -208,3 +208,136 @@ exports.analytics = async (req, res) => {
     }
 
 };
+
+// ===========================
+// Helper tanggal untuk PENDAPATAN
+// Batas tanggal (hari ini/bulan ini/tahun ini) dihitung di
+// Node.js memakai zona waktu Asia/Jakarta (WIB), BUKAN memakai
+// CURDATE()/NOW() milik MySQL. Koneksi MySQL di config/db.js
+// tidak mengatur timezone secara eksplisit, sehingga
+// CURDATE()/NOW() bisa memakai timezone server MySQL yang
+// berbeda dari waktu lokal aplikasi -> transaksi "hari ini"
+// bisa tidak terhitung (Pendapatan Hari Ini salah).
+// Dengan menghitung batas tanggal di Node lalu memakai
+// perbandingan rentang (>= awal AND < akhir), hasilnya konsisten
+// terlepas dari timezone MySQL, dan tidak ada operasi pengurangan
+// tanggal yang berpotensi menghasilkan nilai negatif.
+// ===========================
+function getJakartaNow() {
+    const jakartaString = new Date().toLocaleString("en-US", {
+        timeZone: "Asia/Jakarta"
+    });
+    return new Date(jakartaString);
+}
+
+function formatDateTime(date) {
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+function getRevenueDateRanges() {
+
+    const now = getJakartaNow();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const d = now.getDate();
+
+    const startOfToday = new Date(y, m, d, 0, 0, 0);
+    const startOfTomorrow = new Date(y, m, d + 1, 0, 0, 0);
+
+    const startOfMonth = new Date(y, m, 1, 0, 0, 0);
+    const startOfNextMonth = new Date(y, m + 1, 1, 0, 0, 0);
+
+    const startOfYear = new Date(y, 0, 1, 0, 0, 0);
+    const startOfNextYear = new Date(y + 1, 0, 1, 0, 0, 0);
+
+    return {
+        today: [formatDateTime(startOfToday), formatDateTime(startOfTomorrow)],
+        month: [formatDateTime(startOfMonth), formatDateTime(startOfNextMonth)],
+        year: [formatDateTime(startOfYear), formatDateTime(startOfNextYear)]
+    };
+
+}
+
+// ===========================
+// PENDAPATAN (untuk Card Dashboard Pendapatan)
+// Hanya menghitung data parkir dengan status "Keluar" (selesai),
+// diambil langsung dari kolom biaya yang tersimpan di database.
+// ===========================
+exports.revenue = async (req, res) => {
+
+    try {
+
+        const ranges = getRevenueDateRanges();
+
+        const [
+            todayRows,
+            monthRows,
+            yearRows,
+            activeRows,
+            completedRows,
+            totalRows
+        ] = await Promise.all([
+
+            // Pendapatan hari ini (rentang tanggal, timezone Asia/Jakarta)
+            queryAsync(
+                `SELECT COALESCE(SUM(biaya), 0) AS total
+                FROM parkir
+                WHERE status = 'Keluar'
+                AND waktu_keluar >= ? AND waktu_keluar < ?`,
+                ranges.today
+            ),
+
+            // Pendapatan bulan berjalan
+            queryAsync(
+                `SELECT COALESCE(SUM(biaya), 0) AS total
+                FROM parkir
+                WHERE status = 'Keluar'
+                AND waktu_keluar >= ? AND waktu_keluar < ?`,
+                ranges.month
+            ),
+
+            // Pendapatan tahun berjalan
+            queryAsync(
+                `SELECT COALESCE(SUM(biaya), 0) AS total
+                FROM parkir
+                WHERE status = 'Keluar'
+                AND waktu_keluar >= ? AND waktu_keluar < ?`,
+                ranges.year
+            ),
+
+            // Kendaraan yang masih aktif parkir
+            queryAsync(
+                `SELECT COUNT(*) AS total FROM parkir WHERE status = 'Parkir'`
+            ),
+
+            // Kendaraan yang sudah selesai (keluar)
+            queryAsync(
+                `SELECT COUNT(*) AS total FROM parkir WHERE status = 'Keluar'`
+            ),
+
+            // Total seluruh transaksi parkir
+            queryAsync(
+                `SELECT COUNT(*) AS total FROM parkir`
+            )
+
+        ]);
+
+        res.json({
+            today: Number(todayRows[0].total) || 0,
+            month: Number(monthRows[0].total) || 0,
+            year: Number(yearRows[0].total) || 0,
+            activeVehicles: activeRows[0].total,
+            completedVehicles: completedRows[0].total,
+            totalTransactions: totalRows[0].total
+        });
+
+    } catch (err) {
+
+        res.status(500).json({
+            message: err.message
+        });
+
+    }
+
+};
