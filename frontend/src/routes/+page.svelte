@@ -97,7 +97,7 @@
                             id="email"
                             type="email"
                             bind:value={email}
-                            placeholder="Masukkan email"
+                            placeholder="Masukkan email terdaftar"
                             required
                         />
                     </div>
@@ -115,7 +115,7 @@
                             id="password"
                             type="password"
                             bind:value={password}
-                            placeholder="Masukkan password"
+                            placeholder="Masukkan password terdaftar"
                             required
                         />
 

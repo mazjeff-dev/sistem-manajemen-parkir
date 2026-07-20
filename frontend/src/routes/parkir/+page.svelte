@@ -23,15 +23,56 @@ function toDatetimeLocal(date) {
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+// ===========================
+// Tarif Parkir Otomatis (tetap per transaksi, bukan per jam)
+// Nilai ini hanya untuk PREVIEW di modal, tarif final
+// tetap dihitung ulang & divalidasi di backend.
+// ===========================
+const TARIF_PARKIR = {
+    motor: 2000,
+    mobil: 5000,
+    bus: 10000,
+    truk: 15000
+};
+
+function getTarif(namaJenis) {
+    const nama = String(namaJenis || "").toLowerCase();
+    if (nama.includes("truk")) return TARIF_PARKIR.truk;
+    if (nama.includes("bus")) return TARIF_PARKIR.bus;
+    if (nama.includes("mobil")) return TARIF_PARKIR.mobil;
+    if (nama.includes("motor")) return TARIF_PARKIR.motor;
+    return 0;
+}
+
+function hitungDurasiText(waktuMasukStr, waktuKeluarLocalStr) {
+    const masuk = new Date(String(waktuMasukStr).replace(" ", "T"));
+    const keluar = new Date(waktuKeluarLocalStr);
+
+    let totalMenit = Math.round((keluar - masuk) / 60000);
+    if (isNaN(totalMenit) || totalMenit < 0) totalMenit = 0;
+
+    const jam = Math.floor(totalMenit / 60);
+    const menit = totalMenit % 60;
+
+    if (jam > 0 && menit > 0) return `${jam} jam ${menit} menit`;
+    if (jam > 0) return `${jam} jam`;
+    return `${menit} menit`;
+}
+
 let showModal = $state(false);
 let kendaraanId = $state("");
 let waktuMasuk = $state(toDatetimeLocal(new Date()));
 
 let showKeluarModal = $state(false);
-let keluarId = $state(null);
-let keluarPlat = $state("");
+let keluarItem = $state(null);
 let waktuKeluar = $state(toDatetimeLocal(new Date()));
-let biaya = $state(0);
+
+let tarifPreview = $derived(getTarif(keluarItem?.nama_jenis));
+let durasiPreview = $derived(
+    keluarItem
+        ? hitungDurasiText(keluarItem.waktu_masuk, waktuKeluar)
+        : "-"
+);
 
 let showDeleteModal = $state(false);
 let deleteId = $state(null);
@@ -175,10 +216,8 @@ async function tambahParkir() {
 
 function bukaKeluar(item) {
 
-    keluarId = item.id;
-    keluarPlat = item.plat_nomor;
+    keluarItem = item;
     waktuKeluar = toDatetimeLocal(new Date());
-    biaya = 0;
     showKeluarModal = true;
 
 }
@@ -191,7 +230,7 @@ async function catatKeluar() {
 
         const response = await fetch(
 
-            `${BASE_URL}/parkir/${keluarId}`,
+            `${BASE_URL}/parkir/${keluarItem.id}`,
 
             {
 
@@ -202,10 +241,11 @@ async function catatKeluar() {
                     Authorization: `Bearer ${token}`
                 },
 
+                // Biaya TIDAK dikirim dari frontend - tarif tetap
+                // dihitung & divalidasi otomatis oleh backend
+                // berdasarkan jenis kendaraan.
                 body: JSON.stringify({
-                    waktu_keluar: waktuKeluar.replace("T", " ") + ":00",
-                    status: "Keluar",
-                    biaya: biaya
+                    waktu_keluar: waktuKeluar.replace("T", " ") + ":00"
                 })
 
             }
@@ -227,10 +267,11 @@ async function catatKeluar() {
         }
 
         showKeluarModal = false;
-        keluarId = null;
-        keluarPlat = "";
+        keluarItem = null;
 
-        showToast("Kendaraan berhasil dicatat keluar");
+        showToast(
+            `Kendaraan berhasil keluar. Total biaya: ${formatBiaya(data.data.biaya)}`
+        );
 
         loadParkir();
 
@@ -305,7 +346,7 @@ function formatWaktu(value) {
 
 function formatBiaya(value) {
     if (!value) return "-";
-    return "Rp " + Number(value).toLocaleString("id-ID");
+    return "Rp" + Number(value).toLocaleString("id-ID");
 }
 
 function showToast(message, type = "success") {
@@ -506,36 +547,69 @@ onMount(() => {
 
             {/if}
 
-            {#if showKeluarModal}
+            {#if showKeluarModal && keluarItem}
 
             <div class="modal">
 
                 <div class="modal-content">
 
-                    <h2>Catat Kendaraan Keluar</h2>
+                    <h2>🚗 Proses Kendaraan Keluar</h2>
 
-                    <p class="sub">Plat Nomor: <b>{keluarPlat}</b></p>
+                    <div class="keluar-detail">
+
+                        <div class="detail-row">
+                            <span>Plat Nomor</span>
+                            <b>{keluarItem.plat_nomor}</b>
+                        </div>
+
+                        <div class="detail-row">
+                            <span>Jenis</span>
+                            <b>{keluarItem.nama_jenis}</b>
+                        </div>
+
+                        <div class="detail-row">
+                            <span>Jam Masuk</span>
+                            <b>{formatWaktu(keluarItem.waktu_masuk)}</b>
+                        </div>
+
+                        <div class="detail-row">
+                            <span>Jam Keluar</span>
+                            <b>{formatWaktu(waktuKeluar.replace("T", " "))}</b>
+                        </div>
+
+                        <div class="detail-row">
+                            <span>Durasi</span>
+                            <b>{durasiPreview}</b>
+                        </div>
+
+                        <div class="detail-row">
+                            <span>Tarif Tetap</span>
+                            <b>{formatBiaya(tarifPreview)}</b>
+                        </div>
+
+                        <div class="detail-row total">
+                            <span>Total Biaya</span>
+                            <b>{formatBiaya(tarifPreview)}</b>
+                        </div>
+
+                    </div>
 
                     <input
                         type="datetime-local"
                         bind:value={waktuKeluar}
                     />
 
-                    <input
-                        type="number"
-                        min="0"
-                        bind:value={biaya}
-                        placeholder="Biaya parkir (Rp)"
-                    />
-
                     <div class="action">
 
-                        <button class="cancel" onclick={() => showKeluarModal = false}>
+                        <button class="cancel" onclick={() => {
+                            showKeluarModal = false;
+                            keluarItem = null;
+                        }}>
                             Batal
                         </button>
 
                         <button class="save" onclick={catatKeluar}>
-                            Simpan
+                            Proses Kendaraan Keluar
                         </button>
 
                     </div>
@@ -721,9 +795,37 @@ tr:hover{
     animation:popup .25s;
 }
 
-.modal-content .sub{
+.keluar-detail{
     margin-top:15px;
+    background:#f8fafc;
+    border-radius:12px;
+    padding:14px 16px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+}
+
+.detail-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-size:14px;
+    color:#334155;
+}
+
+.detail-row span{
     color:#64748b;
+}
+
+.detail-row.total{
+    border-top:1px dashed #cbd5e1;
+    padding-top:10px;
+    margin-top:2px;
+    font-size:16px;
+}
+
+.detail-row.total b{
+    color:#16a34a;
 }
 
 .modal-content input,

@@ -101,7 +101,7 @@
     <div>
 
         <h1 class="text-2xl font-bold text-slate-800">
-            Sistem Manajemen Parkir
+            Sistem Manajemen Parkir kendaraan
         </h1>
 
         <p class="text-gray-500">

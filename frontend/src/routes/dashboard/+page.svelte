@@ -20,7 +20,13 @@
         CircleCheckBig,
         LogOut,
         CalendarDays,
-        CalendarRange
+        CalendarRange,
+        Wallet,
+        Banknote,
+        TrendingUp,
+        Car,
+        CircleCheck,
+        Receipt
     } from "lucide-svelte";
 
     let dashboard = $state({
@@ -40,6 +46,15 @@
         recent_activity: []
     });
 
+    let revenue = $state({
+        today: 0,
+        month: 0,
+        year: 0,
+        activeVehicles: 0,
+        completedVehicles: 0,
+        totalTransactions: 0
+    });
+
     let loading = $state(true);
 
     function handleUnauthorized() {
@@ -56,22 +71,26 @@
         }
 
         try {
-            const [dashboardRes, analyticsRes] = await Promise.all([
+            const [dashboardRes, analyticsRes, revenueRes] = await Promise.all([
                 fetch(`${BASE_URL}/dashboard`, {
                     headers: { Authorization: `Bearer ${token}` }
                 }),
                 fetch(`${BASE_URL}/dashboard/analytics`, {
                     headers: { Authorization: `Bearer ${token}` }
+                }),
+                fetch(`${BASE_URL}/dashboard/revenue`, {
+                    headers: { Authorization: `Bearer ${token}` }
                 })
             ]);
 
-            if (dashboardRes.status === 401 || analyticsRes.status === 401) {
+            if (dashboardRes.status === 401 || analyticsRes.status === 401 || revenueRes.status === 401) {
                 handleUnauthorized();
                 return;
             }
 
             dashboard = await dashboardRes.json();
             analytics = await analyticsRes.json();
+            revenue = await revenueRes.json();
 
         } catch (error) {
             console.log(error);
@@ -152,6 +171,62 @@
                     icon={LogOut}
                     variant="red"
                     delay={240}
+                />
+
+            </div>
+
+            <!-- Pendapatan -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+
+                <Card
+                    title="Pendapatan Hari Ini"
+                    value={revenue.today}
+                    format="currency"
+                    icon={Wallet}
+                    variant="blue"
+                    delay={0}
+                />
+
+                <Card
+                    title="Pendapatan Bulan Ini"
+                    value={revenue.month}
+                    format="currency"
+                    icon={Banknote}
+                    variant="green"
+                    delay={80}
+                />
+
+                <Card
+                    title="Pendapatan Tahun Ini"
+                    value={revenue.year}
+                    format="currency"
+                    icon={TrendingUp}
+                    variant="orange"
+                    delay={160}
+                />
+
+                <Card
+                    title="Kendaraan Aktif"
+                    value={revenue.activeVehicles}
+                    icon={Car}
+                    variant="white"
+                    delay={240}
+                />
+
+                <Card
+                    title="Kendaraan Selesai"
+                    value={revenue.completedVehicles}
+                    icon={CircleCheck}
+                    variant="white"
+                    delay={320}
+                />
+
+                <Card
+                    title="Total Transaksi"
+                    value={revenue.totalTransactions}
+                    icon={Receipt}
+                    variant="white"
+                    delay={400}
                 />
 
             </div>
