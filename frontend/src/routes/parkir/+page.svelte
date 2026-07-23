@@ -11,6 +11,17 @@ let parkir = $state([]);
 let kendaraanList = $state([]);
 let search = $state("");
 
+// Kendaraan yang boleh dipilih di modal "Tambah Parkir":
+// hanya yang belum punya entri parkir aktif (status "Parkir"),
+// supaya satu kendaraan tidak bisa dicatat masuk dua kali sekaligus.
+let kendaraanTersedia = $derived(
+    kendaraanList.filter((k) =>
+        !parkir.some(
+            (p) => p.plat_nomor === k.plat_nomor && p.status === "Parkir"
+        )
+    )
+);
+
 let filteredParkir = $derived(
     parkir.filter((item) =>
         item.plat_nomor.toLowerCase().includes(search.toLowerCase()) ||
@@ -519,10 +530,13 @@ onMount(() => {
 
                     <select bind:value={kendaraanId}>
                         <option value="" disabled>Pilih kendaraan</option>
-                        {#each kendaraanList as item}
+                        {#each kendaraanTersedia as item}
                             <option value={item.id}>{item.plat_nomor} - {item.nama_pemilik}</option>
                         {/each}
                     </select>
+                    {#if kendaraanList.length > 0 && kendaraanTersedia.length === 0}
+                        <p class="hint-empty">Semua kendaraan sedang parkir</p>
+                    {/if}
 
                     <input
                         type="datetime-local"
@@ -836,6 +850,12 @@ tr:hover{
     border:1px solid #ddd;
     border-radius:10px;
     font-size:15px;
+}
+
+.hint-empty{
+    margin-top:8px;
+    font-size:13px;
+    color:#b91c1c;
 }
 
 .action{

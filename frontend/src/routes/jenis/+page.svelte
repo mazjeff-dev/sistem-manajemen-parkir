@@ -85,12 +85,6 @@ async function tambahJenis() {
 
         const token = localStorage.getItem("token");
 
-        console.log("Token:", token);
-
-        console.log("Body:", {
-            nama_jenis: namaJenis
-        });
-
         const response = await fetch(`${BASE_URL}/jenis`, {
 
             method: "POST",
@@ -106,11 +100,7 @@ async function tambahJenis() {
 
         });
 
-        console.log("Status:", response.status);
-
         const data = await response.json();
-
-        console.log("Response:", data);
 
         if (response.status === 401) {
             handleUnauthorized();
@@ -323,7 +313,14 @@ onMount(() => {
                     placeholder="🔍 Cari jenis kendaraan..."
                 />
 
-                <button onclick={() => showModal = true}>
+                <button
+                    onclick={() => {
+                        editMode = false;
+                        selectedId = null;
+                        namaJenis = "";
+                        showModal = true;
+                    }}
+                >
                     + Tambah Jenis
                 </button>
 
