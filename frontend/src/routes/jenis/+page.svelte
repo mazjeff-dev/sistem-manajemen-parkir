@@ -20,6 +20,7 @@ let filteredJenis = $derived(
 );
 let showModal = $state(false);
 let namaJenis = $state("");
+let tarif = $state("");
 let editMode = $state(false);
 let selectedId = $state(null);
 let showDeleteModal = $state(false);
@@ -36,6 +37,11 @@ function handleUnauthorized() {
     logout();
     showToast("Sesi berakhir, silakan login kembali", "error");
     goto("/");
+}
+
+function formatRupiah(angka) {
+    const nilai = Number(angka) || 0;
+    return "Rp " + nilai.toLocaleString("id-ID");
 }
 
 async function loadJenis() {
@@ -95,7 +101,8 @@ async function tambahJenis() {
             },
 
             body: JSON.stringify({
-                nama_jenis: namaJenis
+                nama_jenis: namaJenis,
+                tarif: tarif
             })
 
         });
@@ -115,6 +122,7 @@ async function tambahJenis() {
         }
 
         namaJenis = "";
+        tarif = "";
 
         showModal = false;
 
@@ -142,6 +150,8 @@ function bukaEdit(item) {
 
     namaJenis = item.nama_jenis;
 
+    tarif = item.tarif;
+
 }
 
 async function updateJenis() {
@@ -168,7 +178,9 @@ async function updateJenis() {
 
                 body:JSON.stringify({
 
-                    nama_jenis:namaJenis
+                    nama_jenis:namaJenis,
+
+                    tarif:tarif
 
                 })
 
@@ -196,6 +208,8 @@ async function updateJenis() {
         editMode = false;
 
         namaJenis = "";
+
+        tarif = "";
 
         selectedId = null;
 
@@ -318,6 +332,7 @@ onMount(() => {
                         editMode = false;
                         selectedId = null;
                         namaJenis = "";
+                        tarif = "";
                         showModal = true;
                     }}
                 >
@@ -347,6 +362,8 @@ onMount(() => {
 
                         <th>Nama Jenis</th>
 
+                        <th>Tarif Parkir</th>
+
                         <th>Aksi</th>
 
                         </tr>
@@ -359,7 +376,7 @@ onMount(() => {
 
                 <tr>
 
-                    <td colspan="3" class="empty">
+                    <td colspan="4" class="empty">
 
                         Data tidak ditemukan
 
@@ -376,6 +393,8 @@ onMount(() => {
                     <td>{index + 1}</td>
 
                     <td>{item.nama_jenis}</td>
+
+                    <td>{formatRupiah(item.tarif)}</td>
 
                     <td>
 
@@ -477,6 +496,14 @@ onMount(() => {
                     placeholder="Nama jenis kendaraan"
                     >
 
+                    <input
+                    type="number"
+                    min="0"
+                    step="500"
+                    bind:value={tarif}
+                    placeholder="Tarif parkir (Rp)"
+                    >
+
                     <div class="action">
 
                         <button
@@ -486,6 +513,7 @@ onMount(() => {
                                 editMode = false;
                                 selectedId = null;
                                 namaJenis = "";
+                                tarif = "";
 
                             }}
                         >

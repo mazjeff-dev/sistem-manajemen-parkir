@@ -38,6 +38,10 @@ function toDatetimeLocal(date) {
 // Tarif Parkir Otomatis (tetap per transaksi, bukan per jam)
 // Nilai ini hanya untuk PREVIEW di modal, tarif final
 // tetap dihitung ulang & divalidasi di backend.
+// Diutamakan pakai tarif_jenis (dari kolom jenis_kendaraan.tarif
+// yang bisa diatur di halaman Jenis Kendaraan). Pemetaan kata
+// kunci di bawah cuma fallback untuk data lama yang belum
+// diisi tarifnya.
 // ===========================
 const TARIF_PARKIR = {
     motor: 2000,
@@ -46,13 +50,19 @@ const TARIF_PARKIR = {
     truk: 15000
 };
 
-function getTarif(namaJenis) {
+function getTarifFallback(namaJenis) {
     const nama = String(namaJenis || "").toLowerCase();
     if (nama.includes("truk")) return TARIF_PARKIR.truk;
     if (nama.includes("bus")) return TARIF_PARKIR.bus;
     if (nama.includes("mobil")) return TARIF_PARKIR.mobil;
     if (nama.includes("motor")) return TARIF_PARKIR.motor;
     return 0;
+}
+
+function getTarif(item) {
+    const tarifJenis = Number(item?.tarif_jenis);
+    if (!isNaN(tarifJenis) && tarifJenis > 0) return tarifJenis;
+    return getTarifFallback(item?.nama_jenis);
 }
 
 function hitungDurasiText(waktuMasukStr, waktuKeluarLocalStr) {
@@ -78,7 +88,7 @@ let showKeluarModal = $state(false);
 let keluarItem = $state(null);
 let waktuKeluar = $state(toDatetimeLocal(new Date()));
 
-let tarifPreview = $derived(getTarif(keluarItem?.nama_jenis));
+let tarifPreview = $derived(getTarif(keluarItem));
 let durasiPreview = $derived(
     keluarItem
         ? hitungDurasiText(keluarItem.waktu_masuk, waktuKeluar)
