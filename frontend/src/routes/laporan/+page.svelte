@@ -445,7 +445,7 @@ onMount(() => {
 <div class="page">
 
     <div class="page-header">
-        <h1>Laporan Parkir</h1>
+        <h1 class="text-3xl font-bold text-slate-800">Laporan parkir</h1>
         <p class="subtitle">Kelola dan lihat seluruh riwayat parkir kendaraan.</p>
     </div>
 

@@ -370,7 +370,7 @@ onMount(() => {
 
 <div class="page">
 
-    <h1>Parkir</h1>
+    <h1 class="text-3xl font-bold text-slate-800">Parkir</h1>
 
             <p class="total-data">
                 Total Data :

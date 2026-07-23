@@ -306,7 +306,7 @@ onMount(() => {
 
 <div class="page">
 
-    <h1>Jenis Kendaraan</h1>
+    <h1 class="text-3xl font-bold text-slate-800">Jenis kendaraan</h1>
 
             <p class="total-data">
 
