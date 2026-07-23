@@ -71,12 +71,12 @@ exports.createParkir = (req, res) => {
         });
     }
 
+    // Cegah kendaraan yang sama dicatat "masuk" dua kali
+    // selama entri parkir sebelumnya masih berstatus Aktif ("Parkir")
     db.query(
-        `INSERT INTO parkir
-        (kendaraan_id, waktu_masuk)
-        VALUES (?, ?)`,
-        [kendaraan_id, waktu_masuk],
-        (err, result) => {
+        `SELECT id FROM parkir WHERE kendaraan_id = ? AND status = 'Parkir'`,
+        [kendaraan_id],
+        (err, aktif) => {
 
             if (err) {
                 return res.status(500).json({
@@ -84,9 +84,31 @@ exports.createParkir = (req, res) => {
                 });
             }
 
-            res.status(201).json({
-                message: "Data parkir berhasil ditambahkan"
-            });
+            if (aktif.length > 0) {
+                return res.status(400).json({
+                    message: "Kendaraan ini masih tercatat sedang parkir"
+                });
+            }
+
+            db.query(
+                `INSERT INTO parkir
+                (kendaraan_id, waktu_masuk)
+                VALUES (?, ?)`,
+                [kendaraan_id, waktu_masuk],
+                (err, result) => {
+
+                    if (err) {
+                        return res.status(500).json({
+                            message: err.message
+                        });
+                    }
+
+                    res.status(201).json({
+                        message: "Data parkir berhasil ditambahkan"
+                    });
+
+                }
+            );
 
         }
     );
