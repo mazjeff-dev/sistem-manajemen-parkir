@@ -16,7 +16,11 @@ const queryAsync = (sql, params = []) => {
 
 // ===========================
 // TARIF PARKIR OTOMATIS
-// Tarif TETAP per transaksi, TIDAK berdasarkan durasi/jam
+// Tarif TETAP per transaksi, TIDAK berdasarkan durasi/jam.
+// Sumber utama tarif adalah kolom jenis_kendaraan.tarif (bisa
+// diatur lewat halaman "Jenis Kendaraan"). Pemetaan kata kunci
+// di bawah ini hanya dipakai sebagai FALLBACK untuk data lama
+// yang belum diisi tarifnya (tarif = 0 / NULL).
 // ===========================
 const TARIF_PARKIR = {
     motor: 2000,
@@ -25,7 +29,7 @@ const TARIF_PARKIR = {
     truk: 15000
 };
 
-// Menentukan tarif tetap berdasarkan nama jenis kendaraan.
+// Menentukan tarif fallback berdasarkan nama jenis kendaraan.
 // Menggunakan pencocokan kata kunci (bukan exact match) supaya
 // tetap tahan terhadap variasi penamaan jenis, contoh:
 // "Sepeda Motor", "Mobil Pribadi", dll.
@@ -39,6 +43,21 @@ function getTarifByJenis(namaJenis) {
     if (nama.includes("motor")) return TARIF_PARKIR.motor;
 
     return null;
+
+}
+
+// Menentukan tarif final yang dipakai: utamakan tarif yang
+// tersimpan di jenis_kendaraan (diatur manual lewat halaman
+// Jenis Kendaraan), fallback ke pemetaan kata kunci jika belum diisi.
+function resolveTarif(tarifJenis, namaJenis) {
+
+    const tarifNum = Number(tarifJenis);
+
+    if (!isNaN(tarifNum) && tarifNum > 0) {
+        return tarifNum;
+    }
+
+    return getTarifByJenis(namaJenis);
 
 }
 
@@ -127,6 +146,7 @@ exports.getParkir = (req, res) => {
             kendaraan.nama_pemilik,
             kendaraan.warna,
             jenis_kendaraan.nama_jenis,
+            jenis_kendaraan.tarif AS tarif_jenis,
             parkir.waktu_masuk,
             parkir.waktu_keluar,
             parkir.status,
@@ -170,7 +190,8 @@ exports.updateParkir = async (req, res) => {
                 parkir.waktu_masuk,
                 parkir.status,
                 kendaraan.plat_nomor,
-                jenis_kendaraan.nama_jenis
+                jenis_kendaraan.nama_jenis,
+                jenis_kendaraan.tarif
             FROM parkir
             JOIN kendaraan
                 ON parkir.kendaraan_id = kendaraan.id
@@ -211,8 +232,9 @@ exports.updateParkir = async (req, res) => {
             });
         }
 
-        // 4. Tentukan tarif tetap berdasarkan jenis kendaraan
-        const tarif = getTarifByJenis(dataParkir.nama_jenis);
+        // 4. Tentukan tarif berdasarkan jenis kendaraan (tarif dari
+        // database, fallback ke pemetaan kata kunci jika belum diisi)
+        const tarif = resolveTarif(dataParkir.tarif, dataParkir.nama_jenis);
 
         if (tarif === null) {
             return res.status(400).json({

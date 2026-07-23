@@ -3,17 +3,25 @@ const db = require("../config/db");
 // CREATE
 exports.createJenis = (req, res) => {
 
-    const { nama_jenis } = req.body;
+    const { nama_jenis, tarif } = req.body;
 
-    if (!nama_jenis) {
+    if (!nama_jenis || tarif === undefined || tarif === null || tarif === "") {
         return res.status(400).json({
-            message: "Nama jenis wajib diisi"
+            message: "Nama jenis dan tarif wajib diisi"
+        });
+    }
+
+    const tarifNum = Number(tarif);
+
+    if (isNaN(tarifNum) || tarifNum < 0) {
+        return res.status(400).json({
+            message: "Tarif harus berupa angka dan tidak boleh negatif"
         });
     }
 
     db.query(
-        "INSERT INTO jenis_kendaraan (nama_jenis) VALUES (?)",
-        [nama_jenis],
+        "INSERT INTO jenis_kendaraan (nama_jenis, tarif) VALUES (?, ?)",
+        [nama_jenis, tarifNum],
         (err, result) => {
 
             if (err) {
@@ -57,17 +65,25 @@ exports.getJenis = (req, res) => {
 exports.updateJenis = (req, res) => {
 
     const { id } = req.params;
-    const { nama_jenis } = req.body;
+    const { nama_jenis, tarif } = req.body;
 
-    if (!nama_jenis) {
+    if (!nama_jenis || tarif === undefined || tarif === null || tarif === "") {
         return res.status(400).json({
-            message: "Nama jenis wajib diisi"
+            message: "Nama jenis dan tarif wajib diisi"
+        });
+    }
+
+    const tarifNum = Number(tarif);
+
+    if (isNaN(tarifNum) || tarifNum < 0) {
+        return res.status(400).json({
+            message: "Tarif harus berupa angka dan tidak boleh negatif"
         });
     }
 
     db.query(
-        "UPDATE jenis_kendaraan SET nama_jenis = ? WHERE id = ?",
-        [nama_jenis, id],
+        "UPDATE jenis_kendaraan SET nama_jenis = ?, tarif = ? WHERE id = ?",
+        [nama_jenis, tarifNum, id],
         (err, result) => {
 
             if (err) {
