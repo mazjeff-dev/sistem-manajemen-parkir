@@ -10,14 +10,14 @@ Pencatatan kendaraan yang masuk dan keluar area parkir secara manual (buku/kerta
 
 | Nama | NIM | Pembagian Tugas |
 |---|---|---|
-| _(abduhu rafik)_ | _(2024520045)_ | _(mis. Skema database, REST API & autentikasi backend, endpoint jenis kendaraan/kendaraan/parkir)_ |
-| _(romeo djefzy romadhoni)_ | _(2024520022)_ | _(mis. UI/UX frontend Svelte, integrasi API, dashboard analitik & laporan)_ |
+| romeo djefzy romadhoni | 2024520022 | Skema database, REST API & autentikasi backend, endpoint jenis kendaraan/kendaraan/parkir |
+| abduhu rafik | 2024520045 | UI/UX frontend Svelte, integrasi API, dashboard analitik & laporan |
 
 > **Catatan:** sesuaikan tabel di atas dengan pembagian tugas yang benar-benar dikerjakan, karena akan dicocokkan dengan riwayat commit GitHub masing-masing anggota saat penilaian.
 
 ## Teknologi yang Digunakan
 
-- **Frontend:** SvelteKit (Svelte 5), Vite
+- **Frontend:** SvelteKit (Svelte 5), Vite 
 - **Backend:** Node.js, Express.js
 - **Database:** MySQL (mysql2) — relasional
 - **Autentikasi:** JWT (JSON Web Token) + bcrypt untuk hashing password
