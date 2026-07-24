@@ -18,12 +18,16 @@ exports.createKendaraan = (req, res) => {
         });
     }
 
+    // Normalisasi plat nomor: hapus spasi berlebih di awal/akhir dan
+    // seragamkan jadi huruf kapital, supaya "b 1234 xyz" dan
+    // "B 1234 XYZ" dianggap plat yang sama saat dicek duplikat.
+    const platNomorClean = String(plat_nomor).trim().toUpperCase();
+
+    // Cegah plat nomor yang sama terdaftar dua kali sebagai kendaraan berbeda
     db.query(
-        `INSERT INTO kendaraan
-        (plat_nomor, nama_pemilik, warna, jenis_id)
-        VALUES (?, ?, ?, ?)`,
-        [plat_nomor, nama_pemilik, warna, jenis_id],
-        (err, result) => {
+        "SELECT id FROM kendaraan WHERE UPPER(plat_nomor) = ?",
+        [platNomorClean],
+        (err, existing) => {
 
             if (err) {
                 return res.status(500).json({
@@ -31,9 +35,31 @@ exports.createKendaraan = (req, res) => {
                 });
             }
 
-            res.status(201).json({
-                message: "Kendaraan berhasil ditambahkan"
-            });
+            if (existing.length > 0) {
+                return res.status(400).json({
+                    message: "Plat nomor ini sudah terdaftar"
+                });
+            }
+
+            db.query(
+                `INSERT INTO kendaraan
+                (plat_nomor, nama_pemilik, warna, jenis_id)
+                VALUES (?, ?, ?, ?)`,
+                [platNomorClean, nama_pemilik, warna, jenis_id],
+                (err, result) => {
+
+                    if (err) {
+                        return res.status(500).json({
+                            message: err.message
+                        });
+                    }
+
+                    res.status(201).json({
+                        message: "Kendaraan berhasil ditambahkan"
+                    });
+
+                }
+            );
 
         }
     );
