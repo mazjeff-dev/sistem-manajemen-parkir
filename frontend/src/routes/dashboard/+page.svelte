@@ -106,6 +106,15 @@
 
 <div class="p-8 flex flex-col gap-6">
 
+    {#if loading}
+
+        <div class="dashboard-loading">
+            <div class="spinner"></div>
+            <p>Memuat data dashboard...</p>
+        </div>
+
+    {:else}
+
     <WelcomeCard nama={$profileInfo.nama} />
 
     <!-- Widget: jam, kata-kata, kalender, ringkasan -->
@@ -262,9 +271,34 @@
         <RecentActivity data={analytics.recent_activity} />
     </div>
 
+    {/if}
+
 </div>
 
 <style>
+.dashboard-loading{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:16px;
+    padding:100px 0;
+    color:#64748b;
+}
+
+.spinner{
+    width:42px;
+    height:42px;
+    border:4px solid #e2e8f0;
+    border-top-color:#2563eb;
+    border-radius:50%;
+    animation:spin .8s linear infinite;
+}
+
+@keyframes spin{
+    to{ transform:rotate(360deg); }
+}
+
 .widget-in{
     opacity:0;
     animation: widgetIn .5s ease forwards;
