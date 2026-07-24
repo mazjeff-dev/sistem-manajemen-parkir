@@ -113,7 +113,37 @@ async function loadJenisList() {
 
 }
 
+function validasiForm() {
+
+    if (!platNomor.trim()) {
+        showToast("Plat nomor wajib diisi", "error");
+        return false;
+    }
+
+    if (!namaPemilik.trim()) {
+        showToast("Nama pemilik wajib diisi", "error");
+        return false;
+    }
+
+    if (!warna.trim()) {
+        showToast("Warna kendaraan wajib diisi", "error");
+        return false;
+    }
+
+    if (!jenisId) {
+        showToast("Jenis kendaraan wajib dipilih", "error");
+        return false;
+    }
+
+    return true;
+
+}
+
 async function tambahKendaraan() {
+
+    if (!validasiForm()) {
+        return;
+    }
 
     try {
 
@@ -186,6 +216,10 @@ function bukaEdit(item) {
 }
 
 async function updateKendaraan() {
+
+    if (!validasiForm()) {
+        return;
+    }
 
     try {
 
