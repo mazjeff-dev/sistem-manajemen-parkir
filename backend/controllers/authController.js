@@ -21,8 +21,9 @@ exports.register = async (req, res) => {
             async (err, result) => {
 
                 if (err) {
+                    console.error(err);
                     return res.status(500).json({
-                        message: err.message
+                        message: "Terjadi kesalahan pada server"
                     });
                 }
 
@@ -42,8 +43,9 @@ exports.register = async (req, res) => {
                     (err, result) => {
 
                         if (err) {
+                            console.error(err);
                             return res.status(500).json({
-                                message: err.message
+                                message: "Terjadi kesalahan pada server"
                             });
                         }
 
@@ -58,8 +60,9 @@ exports.register = async (req, res) => {
         );
 
     } catch (error) {
+        console.error(error);
         res.status(500).json({
-            message: error.message
+            message: "Terjadi kesalahan pada server"
         });
     }
 };
@@ -83,8 +86,9 @@ exports.login = (req, res) => {
         async (err, result) => {
 
             if (err) {
+                console.error(err);
                 return res.status(500).json({
-                    message: err.message
+                    message: "Terjadi kesalahan pada server"
                 });
             }
 

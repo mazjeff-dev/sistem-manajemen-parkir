@@ -155,7 +155,7 @@ exports.getParkir = (req, res) => {
         JOIN kendaraan
             ON parkir.kendaraan_id = kendaraan.id
         JOIN jenis_kendaraan
-            ON kendaraan.jenis_id = jenis_kendaraan.id`,
+            ON kendaraan.jenis_id = jenis_kendaraan.id`, 
         (err, result) => {
 
             if (err) {

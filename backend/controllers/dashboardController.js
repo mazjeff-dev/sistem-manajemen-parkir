@@ -35,7 +35,10 @@ exports.dashboard = (req, res) => {
         "SELECT COUNT(*) AS total FROM kendaraan",
         (err, kendaraan) => {
 
-            if (err) return res.status(500).json(err);
+            if (err) {
+                console.error(err);
+                return res.status(500).json({ message: "Terjadi kesalahan pada server" });
+            }
 
             dashboard.total_kendaraan = kendaraan[0].total;
 
@@ -43,7 +46,10 @@ exports.dashboard = (req, res) => {
                 "SELECT COUNT(*) AS total FROM parkir",
                 (err, parkir) => {
 
-                    if (err) return res.status(500).json(err);
+                    if (err) {
+                console.error(err);
+                return res.status(500).json({ message: "Terjadi kesalahan pada server" });
+            }
 
                     dashboard.total_parkir = parkir[0].total;
 
@@ -51,7 +57,10 @@ exports.dashboard = (req, res) => {
                         "SELECT COUNT(*) AS total FROM parkir WHERE status='Parkir'",
                         (err, aktif) => {
 
-                            if (err) return res.status(500).json(err);
+                            if (err) {
+                console.error(err);
+                return res.status(500).json({ message: "Terjadi kesalahan pada server" });
+            }
 
                             dashboard.sedang_parkir = aktif[0].total;
 
@@ -59,7 +68,10 @@ exports.dashboard = (req, res) => {
                                 "SELECT COUNT(*) AS total FROM parkir WHERE status='Keluar'",
                                 (err, keluar) => {
 
-                                    if (err) return res.status(500).json(err);
+                                    if (err) {
+                console.error(err);
+                return res.status(500).json({ message: "Terjadi kesalahan pada server" });
+            }
 
                                     dashboard.sudah_keluar = keluar[0].total;
 
@@ -73,8 +85,10 @@ exports.dashboard = (req, res) => {
                                         GROUP BY jenis_kendaraan.nama_jenis`,
                                         (err, jenis) => {
 
-                                            if (err)
-                                                return res.status(500).json(err);
+                                            if (err) {
+                                                console.error(err);
+                                                return res.status(500).json({ message: "Terjadi kesalahan pada server" });
+                                            }
 
                                             dashboard.jenis = jenis;
 
@@ -201,8 +215,9 @@ exports.analytics = async (req, res) => {
 
     } catch (err) {
 
+        console.error(err);
         res.status(500).json({
-            message: err.message
+            message: "Terjadi kesalahan pada server"
         });
 
     }
@@ -334,8 +349,9 @@ exports.revenue = async (req, res) => {
 
     } catch (err) {
 
+        console.error(err);
         res.status(500).json({
-            message: err.message
+            message: "Terjadi kesalahan pada server"
         });
 
     }

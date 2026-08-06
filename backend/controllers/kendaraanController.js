@@ -23,6 +23,12 @@ exports.createKendaraan = (req, res) => {
     // "B 1234 XYZ" dianggap plat yang sama saat dicek duplikat.
     const platNomorClean = String(plat_nomor).trim().toUpperCase();
 
+    if (platNomorClean.length === 0) {
+        return res.status(400).json({
+            message: "Plat nomor tidak boleh kosong"
+        });
+    }
+
     // Cegah plat nomor yang sama terdaftar dua kali sebagai kendaraan berbeda
     db.query(
         "SELECT id FROM kendaraan WHERE UPPER(plat_nomor) = ?",
@@ -30,8 +36,9 @@ exports.createKendaraan = (req, res) => {
         (err, existing) => {
 
             if (err) {
+                console.error("[createKendaraan] duplicate check:", err);
                 return res.status(500).json({
-                    message: err.message
+                    message: "Terjadi kesalahan pada server"
                 });
             }
 
@@ -49,8 +56,9 @@ exports.createKendaraan = (req, res) => {
                 (err, result) => {
 
                     if (err) {
+                        console.error("[createKendaraan] insert:", err);
                         return res.status(500).json({
-                            message: err.message
+                            message: "Terjadi kesalahan pada server"
                         });
                     }
 
@@ -84,8 +92,9 @@ exports.getKendaraan = (req, res) => {
         (err, result) => {
 
             if (err) {
+                console.error("[getKendaraan]", err);
                 return res.status(500).json({
-                    message: err.message
+                    message: "Terjadi kesalahan pada server"
                 });
             }
 
@@ -116,38 +125,73 @@ exports.updateKendaraan = (req, res) => {
         });
     }
 
+    // Normalisasi plat nomor dengan cara yang SAMA seperti di createKendaraan,
+    // supaya standar pengecekan duplikat konsisten di seluruh aplikasi.
+    const platNomorClean = String(plat_nomor).trim().toUpperCase();
+
+    if (platNomorClean.length === 0) {
+        return res.status(400).json({
+            message: "Plat nomor tidak boleh kosong"
+        });
+    }
+
+    // Cek duplikat plat nomor terhadap kendaraan LAIN (bukan dirinya
+    // sendiri), supaya update tidak bentrok dengan kendaraan lain yang
+    // kebetulan sudah pakai plat nomor yang sama.
     db.query(
-        `UPDATE kendaraan
-        SET
-        plat_nomor = ?,
-        nama_pemilik = ?,
-        warna = ?,
-        jenis_id = ?
-        WHERE id = ?`,
-        [
-            plat_nomor,
-            nama_pemilik,
-            warna,
-            jenis_id,
-            id
-        ],
-        (err, result) => {
+        "SELECT id FROM kendaraan WHERE UPPER(plat_nomor) = ? AND id != ?",
+        [platNomorClean, id],
+        (err, existing) => {
 
             if (err) {
+                console.error("[updateKendaraan] duplicate check:", err);
                 return res.status(500).json({
-                    message: err.message
+                    message: "Terjadi kesalahan pada server"
                 });
             }
 
-            if (result.affectedRows === 0) {
-                return res.status(404).json({
-                    message: "Data tidak ditemukan"
+            if (existing.length > 0) {
+                return res.status(400).json({
+                    message: "Plat nomor sudah digunakan kendaraan lain"
                 });
             }
 
-            res.json({
-                message: "Kendaraan berhasil diupdate"
-            });
+            db.query(
+                `UPDATE kendaraan
+                SET
+                plat_nomor = ?,
+                nama_pemilik = ?,
+                warna = ?,
+                jenis_id = ?
+                WHERE id = ?`,
+                [
+                    platNomorClean,
+                    nama_pemilik,
+                    warna,
+                    jenis_id,
+                    id
+                ],
+                (err, result) => {
+
+                    if (err) {
+                        console.error("[updateKendaraan] update:", err);
+                        return res.status(500).json({
+                            message: "Terjadi kesalahan pada server"
+                        });
+                    }
+
+                    if (result.affectedRows === 0) {
+                        return res.status(404).json({
+                            message: "Data tidak ditemukan"
+                        });
+                    }
+
+                    res.json({
+                        message: "Kendaraan berhasil diupdate"
+                    });
+
+                }
+            );
 
         }
     );
@@ -161,26 +205,53 @@ exports.deleteKendaraan = (req, res) => {
 
     const { id } = req.params;
 
+    // Cek dulu apakah kendaraan ini masih punya riwayat parkir.
+    // Sebelumnya kendaraan bisa langsung dihapus meskipun masih
+    // punya riwayat parkir terkait, yang bisa membuat data parkir
+    // "yatim" (kehilangan referensi kendaraan) atau membuat laporan
+    // jadi tidak akurat.
     db.query(
-        "DELETE FROM kendaraan WHERE id = ?",
+        "SELECT id FROM parkir WHERE kendaraan_id = ? LIMIT 1",
         [id],
-        (err, result) => {
+        (err, riwayat) => {
 
             if (err) {
+                console.error("[deleteKendaraan] check riwayat:", err);
                 return res.status(500).json({
-                    message: err.message
+                    message: "Terjadi kesalahan pada server"
                 });
             }
 
-            if (result.affectedRows === 0) {
-                return res.status(404).json({
-                    message: "Data tidak ditemukan"
+            if (riwayat.length > 0) {
+                return res.status(400).json({
+                    message: "Kendaraan tidak bisa dihapus karena masih memiliki riwayat parkir"
                 });
             }
 
-            res.json({
-                message: "Kendaraan berhasil dihapus"
-            });
+            db.query(
+                "DELETE FROM kendaraan WHERE id = ?",
+                [id],
+                (err, result) => {
+
+                    if (err) {
+                        console.error("[deleteKendaraan] delete:", err);
+                        return res.status(500).json({
+                            message: "Terjadi kesalahan pada server"
+                        });
+                    }
+
+                    if (result.affectedRows === 0) {
+                        return res.status(404).json({
+                            message: "Data tidak ditemukan"
+                        });
+                    }
+
+                    res.json({
+                        message: "Kendaraan berhasil dihapus"
+                    });
+
+                }
+            );
 
         }
     );

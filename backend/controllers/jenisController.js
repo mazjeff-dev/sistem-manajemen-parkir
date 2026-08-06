@@ -25,8 +25,9 @@ exports.createJenis = (req, res) => {
         (err, result) => {
 
             if (err) {
+                console.error(err);
                 return res.status(500).json({
-                    message: err.message
+                    message: "Terjadi kesalahan pada server"
                 });
             }
 
@@ -48,8 +49,9 @@ exports.getJenis = (req, res) => {
         (err, result) => {
 
             if (err) {
+                console.error(err);
                 return res.status(500).json({
-                    message: err.message
+                    message: "Terjadi kesalahan pada server"
                 });
             }
 
@@ -87,8 +89,9 @@ exports.updateJenis = (req, res) => {
         (err, result) => {
 
             if (err) {
+                console.error(err);
                 return res.status(500).json({
-                    message: err.message
+                    message: "Terjadi kesalahan pada server"
                 });
             }
 
@@ -120,8 +123,9 @@ exports.deleteJenis = (req, res) => {
         (err, result) => {
 
             if (err) {
+                console.error(err);
                 return res.status(500).json({
-                    message: err.message
+                    message: "Terjadi kesalahan pada server"
                 });
             }
 
@@ -138,8 +142,9 @@ exports.deleteJenis = (req, res) => {
                 (err, result) => {
 
                     if (err) {
+                        console.error(err);
                         return res.status(500).json({
-                            message: err.message
+                            message: "Terjadi kesalahan pada server"
                         });
                     }
 
