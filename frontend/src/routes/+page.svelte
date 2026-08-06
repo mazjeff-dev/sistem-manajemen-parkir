@@ -152,6 +152,10 @@
 
             </form>
 
+            <p class="register-link">
+                Belum punya akun? <a href="/register">Daftar di sini</a>
+            </p>
+
             <p class="footer">
 
                 Sistem Manajemen Parkir, project klompok 14
@@ -708,6 +712,34 @@ label{
     color:#94a3b8;
 
     font-size:14px;
+
+}
+
+.register-link{
+
+    text-align:center;
+
+    margin-top:18px;
+
+    color:#64748b;
+
+    font-size:14px;
+
+}
+
+.register-link a{
+
+    color:#2563eb;
+
+    font-weight:600;
+
+    text-decoration:none;
+
+}
+
+.register-link a:hover{
+
+    text-decoration:underline;
 
 }
 

@@ -1,8 +1,6 @@
 <script>
     import { onMount } from "svelte";
-    import { goto } from "$app/navigation";
-    import BASE_URL from "../../services/api.js";
-    import { logout } from "../../stores/auth.js";
+    import { apiFetch } from "../../services/api.js";
     import { profileInfo } from "../../stores/profile.js";
     import WelcomeCard from "../../lib/WelcomeCard.svelte";
     import DigitalClock from "../../lib/DigitalClock.svelte";
@@ -57,34 +55,19 @@
 
     let loading = $state(true);
 
-    function handleUnauthorized() {
-        logout();
-        goto("/");
-    }
-
     async function loadDashboard() {
-        const token = localStorage.getItem("token");
-
-        if (!token) {
-            handleUnauthorized();
-            return;
-        }
 
         try {
             const [dashboardRes, analyticsRes, revenueRes] = await Promise.all([
-                fetch(`${BASE_URL}/dashboard`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                }),
-                fetch(`${BASE_URL}/dashboard/analytics`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                }),
-                fetch(`${BASE_URL}/dashboard/revenue`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                })
+                apiFetch("/dashboard"),
+                apiFetch("/dashboard/analytics"),
+                apiFetch("/dashboard/revenue")
             ]);
 
-            if (dashboardRes.status === 401 || analyticsRes.status === 401 || revenueRes.status === 401) {
-                handleUnauthorized();
+            // apiFetch mengembalikan null kalau tidak ada token atau
+            // token expired (401) — redirect ke login sudah ditangani
+            // otomatis di dalam apiFetch.
+            if (!dashboardRes || !analyticsRes || !revenueRes) {
                 return;
             }
 

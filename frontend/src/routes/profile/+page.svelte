@@ -1,8 +1,6 @@
 <script>
     import { onMount } from "svelte";
-    import { goto } from "$app/navigation";
-    import BASE_URL, { SERVER_URL } from "../../services/api.js";
-    import { logout } from "../../stores/auth.js";
+    import { SERVER_URL, apiFetch } from "../../services/api.js";
     import { profileInfo } from "../../stores/profile.js";
     import { UserCircle2, Camera, Save, KeyRound, Loader2 } from "lucide-svelte";
 
@@ -39,12 +37,6 @@
         }, 3000);
     }
 
-    function handleUnauthorized() {
-        logout();
-        showToast("Sesi berakhir, silakan login kembali", "error");
-        goto("/");
-    }
-
     function formatTanggal(tanggal) {
         if (!tanggal) return "-";
         return new Date(tanggal).toLocaleDateString("id-ID", {
@@ -58,21 +50,9 @@
         loadingProfile = true;
 
         try {
-            const token = localStorage.getItem("token");
+            const response = await apiFetch("/profile");
 
-            if (!token) {
-                handleUnauthorized();
-                return;
-            }
-
-            const response = await fetch(`${BASE_URL}/profile`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-
-            if (response.status === 401) {
-                handleUnauthorized();
-                return;
-            }
+            if (!response) return;
 
             const data = await response.json();
 
@@ -102,21 +82,15 @@
         savingProfile = true;
 
         try {
-            const token = localStorage.getItem("token");
-
-            const response = await fetch(`${BASE_URL}/profile`, {
+            const response = await apiFetch("/profile", {
                 method: "PUT",
                 headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`
+                    "Content-Type": "application/json"
                 },
                 body: JSON.stringify({ nama: namaForm, email: emailForm })
             });
 
-            if (response.status === 401) {
-                handleUnauthorized();
-                return;
-            }
+            if (!response) return;
 
             const data = await response.json();
 
@@ -150,13 +124,10 @@
         savingPassword = true;
 
         try {
-            const token = localStorage.getItem("token");
-
-            const response = await fetch(`${BASE_URL}/profile/password`, {
+            const response = await apiFetch("/profile/password", {
                 method: "PUT",
                 headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`
+                    "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
                     password_lama: passwordLama,
@@ -164,10 +135,7 @@
                 })
             });
 
-            if (response.status === 401) {
-                handleUnauthorized();
-                return;
-            }
+            if (!response) return;
 
             const data = await response.json();
 
@@ -206,20 +174,18 @@
         uploadingFoto = true;
 
         try {
-            const token = localStorage.getItem("token");
             const formData = new FormData();
             formData.append("foto", fileTerpilih);
 
-            const response = await fetch(`${BASE_URL}/profile/foto`, {
+            // Catatan: jangan set header Content-Type manual untuk
+            // FormData — browser yang mengaturnya otomatis (termasuk
+            // boundary-nya). apiFetch hanya menambahkan Authorization.
+            const response = await apiFetch("/profile/foto", {
                 method: "POST",
-                headers: { Authorization: `Bearer ${token}` },
                 body: formData
             });
 
-            if (response.status === 401) {
-                handleUnauthorized();
-                return;
-            }
+            if (!response) return;
 
             const data = await response.json();
 

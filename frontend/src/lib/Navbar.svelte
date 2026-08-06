@@ -3,7 +3,7 @@
     import { goto } from "$app/navigation";
     import { page } from "$app/state";
     import { Bell, UserCircle2, CarFront, LogOut } from "lucide-svelte";
-    import BASE_URL, { SERVER_URL } from "../services/api.js";
+    import { SERVER_URL, apiFetch } from "../services/api.js";
     import { profileInfo } from "../stores/profile.js";
 
     let notifOpen = $state(false);
@@ -25,14 +25,9 @@
 
     async function loadProfile() {
         try {
-            const token = localStorage.getItem("token");
-            if (!token) return;
+            const response = await apiFetch("/profile");
 
-            const response = await fetch(`${BASE_URL}/profile`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-
-            if (!response.ok) return;
+            if (!response || !response.ok) return;
 
             const data = await response.json();
 
@@ -51,14 +46,9 @@
         loadingNotif = true;
 
         try {
-            const token = localStorage.getItem("token");
-            if (!token) return;
+            const response = await apiFetch("/dashboard/analytics");
 
-            const response = await fetch(`${BASE_URL}/dashboard/analytics`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-
-            if (!response.ok) return;
+            if (!response || !response.ok) return;
 
             const data = await response.json();
 

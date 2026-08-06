@@ -1,9 +1,7 @@
 <script>
 
 import { onMount } from "svelte";
-import { goto } from "$app/navigation";
-import BASE_URL from "../../services/api.js";
-import { logout } from "../../stores/auth.js";
+import { apiFetch } from "../../services/api.js";
 
 import { Plus, Pencil, Trash2 } from "lucide-svelte";
 
@@ -37,35 +35,15 @@ let toast = $state({
 });
 let loading = $state(true);
 
-function handleUnauthorized() {
-    logout();
-    showToast("Sesi berakhir, silakan login kembali", "error");
-    goto("/");
-}
-
 async function loadKendaraan() {
 
     loading = true;
 
     try {
 
-        const token = localStorage.getItem("token");
+        const response = await apiFetch("/kendaraan");
 
-        if (!token) {
-            handleUnauthorized();
-            return;
-        }
-
-        const response = await fetch(`${BASE_URL}/kendaraan`, {
-            headers: {
-                Authorization: `Bearer ${token}`
-            }
-        });
-
-        if (response.status === 401) {
-            handleUnauthorized();
-            return;
-        }
+        if (!response) return;
 
         const data = await response.json();
 
@@ -88,18 +66,9 @@ async function loadJenisList() {
 
     try {
 
-        const token = localStorage.getItem("token");
+        const response = await apiFetch("/jenis");
 
-        const response = await fetch(`${BASE_URL}/jenis`, {
-            headers: {
-                Authorization: `Bearer ${token}`
-            }
-        });
-
-        if (response.status === 401) {
-            handleUnauthorized();
-            return;
-        }
+        if (!response) return;
 
         const data = await response.json();
 
@@ -147,15 +116,12 @@ async function tambahKendaraan() {
 
     try {
 
-        const token = localStorage.getItem("token");
-
-        const response = await fetch(`${BASE_URL}/kendaraan`, {
+        const response = await apiFetch("/kendaraan", {
 
             method: "POST",
 
             headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`
+                "Content-Type": "application/json"
             },
 
             body: JSON.stringify({
@@ -167,10 +133,7 @@ async function tambahKendaraan() {
 
         });
 
-        if (response.status === 401) {
-            handleUnauthorized();
-            return;
-        }
+        if (!response) return;
 
         const data = await response.json();
 
@@ -223,19 +186,16 @@ async function updateKendaraan() {
 
     try {
 
-        const token = localStorage.getItem("token");
+        const response = await apiFetch(
 
-        const response = await fetch(
-
-            `${BASE_URL}/kendaraan/${selectedId}`,
+            `/kendaraan/${selectedId}`,
 
             {
 
                 method: "PUT",
 
                 headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`
+                    "Content-Type": "application/json"
                 },
 
                 body: JSON.stringify({
@@ -249,10 +209,7 @@ async function updateKendaraan() {
 
         );
 
-        if (response.status === 401) {
-            handleUnauthorized();
-            return;
-        }
+        if (!response) return;
 
         const data = await response.json();
 
@@ -293,22 +250,14 @@ async function deleteKendaraan() {
 
     try {
 
-        const token = localStorage.getItem("token");
-
-        const response = await fetch(
-            `${BASE_URL}/kendaraan/${deleteId}`,
+        const response = await apiFetch(
+            `/kendaraan/${deleteId}`,
             {
-                method: "DELETE",
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
+                method: "DELETE"
             }
         );
 
-        if (response.status === 401) {
-            handleUnauthorized();
-            return;
-        }
+        if (!response) return;
 
         const data = await response.json();
 

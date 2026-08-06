@@ -1,9 +1,7 @@
 <script>
 
 import { onMount } from "svelte";
-import { goto } from "$app/navigation";
-import BASE_URL from "../../services/api.js";
-import { logout } from "../../stores/auth.js";
+import { apiFetch } from "../../services/api.js";
 
 import { Plus, Pencil, Trash2, Search } from "lucide-svelte";
 
@@ -33,12 +31,6 @@ let toast = $state({
 });
 let loading = $state(true);
 
-function handleUnauthorized() {
-    logout();
-    showToast("Sesi berakhir, silakan login kembali", "error");
-    goto("/");
-}
-
 function formatRupiah(angka) {
     const nilai = Number(angka) || 0;
     return "Rp " + nilai.toLocaleString("id-ID");
@@ -50,23 +42,9 @@ async function loadJenis() {
 
     try {
 
-        const token = localStorage.getItem("token");
+        const response = await apiFetch("/jenis");
 
-        if (!token) {
-            handleUnauthorized();
-            return;
-        }
-
-        const response = await fetch(`${BASE_URL}/jenis`, {
-            headers: {
-                Authorization: `Bearer ${token}`
-            }
-        });
-
-        if (response.status === 401) {
-            handleUnauthorized();
-            return;
-        }
+        if (!response) return;
 
         const data = await response.json();
 
@@ -89,15 +67,12 @@ async function tambahJenis() {
 
     try {
 
-        const token = localStorage.getItem("token");
-
-        const response = await fetch(`${BASE_URL}/jenis`, {
+        const response = await apiFetch("/jenis", {
 
             method: "POST",
 
             headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${token}`
+                "Content-Type": "application/json"
             },
 
             body: JSON.stringify({
@@ -107,12 +82,9 @@ async function tambahJenis() {
 
         });
 
-        const data = await response.json();
+        if (!response) return;
 
-        if (response.status === 401) {
-            handleUnauthorized();
-            return;
-        }
+        const data = await response.json();
 
         if (!response.ok) {
 
@@ -158,11 +130,9 @@ async function updateJenis() {
 
     try {
 
-        const token = localStorage.getItem("token");
+        const response = await apiFetch(
 
-        const response = await fetch(
-
-            `${BASE_URL}/jenis/${selectedId}`,
+            `/jenis/${selectedId}`,
 
             {
 
@@ -170,9 +140,7 @@ async function updateJenis() {
 
                 headers:{
 
-                    "Content-Type":"application/json",
-
-                    Authorization:`Bearer ${token}`
+                    "Content-Type":"application/json"
 
                 },
 
@@ -188,12 +156,9 @@ async function updateJenis() {
 
         );
 
-        const data = await response.json();
+        if (!response) return;
 
-        if (response.status === 401) {
-            handleUnauthorized();
-            return;
-        }
+        const data = await response.json();
 
         if(!response.ok){
 
@@ -242,24 +207,16 @@ async function deleteJenis() {
 
     try {
 
-        const token = localStorage.getItem("token");
-
-        const response = await fetch(
-            `${BASE_URL}/jenis/${deleteId}`,
+        const response = await apiFetch(
+            `/jenis/${deleteId}`,
             {
-                method: "DELETE",
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
+                method: "DELETE"
             }
         );
 
-        const data = await response.json();
+        if (!response) return;
 
-        if (response.status === 401) {
-            handleUnauthorized();
-            return;
-        }
+        const data = await response.json();
 
         if (!response.ok) {
 

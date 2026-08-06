@@ -7,12 +7,14 @@
 
 	let { children } = $props();
 
-	// Halaman login ("/") tidak memakai Sidebar & Navbar.
-	// Karena Sidebar & Navbar dipasang di sini (bukan di tiap +page.svelte),
-	// keduanya hanya dibuat sekali selama sesi berjalan sehingga animasi
-	// masuknya cuma tampil sekali saat pertama kali login, bukan setiap
-	// kali pindah menu.
-	let isAuthPage = $derived(page.url.pathname === '/');
+	// Halaman login ("/") dan register ("/register") tidak memakai
+	// Sidebar & Navbar. Karena Sidebar & Navbar dipasang di sini (bukan
+	// di tiap +page.svelte), keduanya hanya dibuat sekali selama sesi
+	// berjalan sehingga animasi masuknya cuma tampil sekali saat pertama
+	// kali login, bukan setiap kali pindah menu.
+	let isAuthPage = $derived(
+		page.url.pathname === '/' || page.url.pathname === '/register'
+	);
 </script>
 
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>

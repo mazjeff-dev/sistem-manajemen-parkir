@@ -1,8 +1,6 @@
 <script>
 
 import { onMount } from "svelte";
-import { goto } from "$app/navigation";
-import { logout } from "../../stores/auth.js";
 import { fetchLaporan } from "../../services/laporanService.js";
 
 import {
@@ -105,15 +103,6 @@ $effect(() => {
 });
 
 // ===========================
-// Auth helper
-// ===========================
-
-function handleUnauthorized() {
-    logout();
-    goto("/");
-}
-
-// ===========================
 // Load data
 // ===========================
 
@@ -124,19 +113,9 @@ async function loadLaporan(start = "", end = "") {
 
     try {
 
-        const token = localStorage.getItem("token");
+        const response = await fetchLaporan({ start, end });
 
-        if (!token) {
-            handleUnauthorized();
-            return;
-        }
-
-        const response = await fetchLaporan(token, { start, end });
-
-        if (response.status === 401) {
-            handleUnauthorized();
-            return;
-        }
+        if (!response) return;
 
         const data = await response.json();
 

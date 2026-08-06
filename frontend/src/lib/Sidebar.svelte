@@ -1,6 +1,7 @@
 <script>
     import { goto } from "$app/navigation";
     import { page } from "$app/state";
+    import { logout as authLogout } from "../stores/auth.js";
     import {
         LayoutDashboard,
         Car,
@@ -24,7 +25,10 @@
     }
 
     function logout() {
-        localStorage.removeItem("token");
+        // Pakai fungsi logout terpusat dari stores/auth.js supaya
+        // konsisten dengan tempat lain (dulu di sini menghapus token
+        // manual dengan localStorage.removeItem langsung).
+        authLogout();
         goto("/");
     }
 
