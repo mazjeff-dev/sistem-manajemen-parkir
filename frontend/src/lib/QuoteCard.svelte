@@ -1,5 +1,5 @@
 <script>
-    import { Sparkles } from "lucide-svelte";
+    import Sparkles from "lucide-svelte/icons/sparkles";
 
     const daftarKata = [
         "Ketertiban parkir yang baik dimulai dari data yang rapi.",

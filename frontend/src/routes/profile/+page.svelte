@@ -2,7 +2,11 @@
     import { onMount } from "svelte";
     import { SERVER_URL, apiFetch } from "../../services/api.js";
     import { profileInfo } from "../../stores/profile.js";
-    import { UserCircle2, Camera, Save, KeyRound, Loader2 } from "lucide-svelte";
+    import UserCircle2 from "lucide-svelte/icons/user-circle-2";
+    import Camera from "lucide-svelte/icons/camera";
+    import Save from "lucide-svelte/icons/save";
+    import KeyRound from "lucide-svelte/icons/key-round";
+    import Loader2 from "lucide-svelte/icons/loader-2";
 
     let profile = $state({
         id: null,

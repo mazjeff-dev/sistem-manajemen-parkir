@@ -23,6 +23,60 @@ Pencatatan kendaraan yang masuk dan keluar area parkir secara manual (buku/kerta
 - **Autentikasi:** JWT (JSON Web Token) + bcrypt untuk hashing password
 - **Lainnya:** Multer (upload foto profil), jsPDF & SheetJS (export laporan)
 
+## Update: Fitur Tambahan
+
+Selain fitur inti di atas, project ini sudah dilengkapi:
+
+1. **Role & hak akses** — akun pertama yang register otomatis jadi **admin**, berikutnya jadi **petugas**. Hanya admin yang bisa mengelola halaman "Jenis Kendaraan" (tarif & kapasitas).
+2. **Manajemen kapasitas/slot parkir** — tiap jenis kendaraan bisa diberi batas kapasitas; sistem menolak kendaraan masuk kalau slot penuh, dan dashboard menampilkan sisa slot secara real-time.
+3. **Tarif berbasis durasi (per jam)** — selain tarif flat, jenis kendaraan bisa diset memakai tarif per jam (dihitung otomatis dari selisih jam masuk & keluar, dibulatkan ke atas).
+4. **Cetak tiket & struk parkir** — tombol "Cetak Tiket" (saat masuk) dan "Cetak Struk" (saat keluar) di halaman Parkir, menghasilkan PDF thermal-receipt lewat jsPDF.
+5. **Keamanan akun lanjutan** — lupa/reset password, refresh token (access token 15 menit + refresh token 7 hari, jadi tidak perlu login ulang tiap jam), dan rate limiting pada endpoint login & lupa password.
+6. **Pagination & pencarian server-side** — endpoint `/kendaraan` dan `/parkir` sekarang mendukung `?page=&limit=&q=` supaya tetap ringan walau datanya sudah banyak.
+
+### Menjalankan migrasi database
+
+Setelah skema awal (tabel `users`, `jenis_kendaraan`, `kendaraan`, `parkir`) sudah ada, jalankan file migrasi berikut untuk menambahkan kolom-kolom fitur baru:
+
+```bash
+mysql -u root -p db_parkir < backend/migrations/002_fitur_lengkap.sql
+```
+
+> Catatan soal lupa password: token reset sekarang dikirim lewat **email** (SMTP, lihat bagian di bawah). `devToken` di response hanya muncul pada mode demo, yaitu saat SMTP belum diisi **dan** `NODE_ENV` bukan `production`.
+
+## Update: Audit, Tarif Lanjutan, Pembayaran, Email Reset
+
+Jalankan migrasi berikut setelah `002` dan `003`:
+
+```bash
+mysql -u root -p db_parkir < backend/migrations/004_audit_tarif_pembayaran.sql
+cd backend && npm install   # menambahkan nodemailer
+```
+
+1. **Pencatatan petugas** — tiap kendaraan masuk/keluar menyimpan siapa petugas yang memprosesnya (`petugas_masuk_id`, `petugas_keluar_id`). Ditampilkan di kolom "Petugas" halaman Parkir.
+2. **Audit log (khusus admin)** — aksi kendaraan masuk, kendaraan keluar, dan hapus data parkir dicatat di tabel `audit_log`. Dilihat lewat menu **Audit Log** (`/admin/audit`).
+3. **Aturan tarif lanjutan** (diatur per jenis kendaraan di halaman Jenis Kendaraan):
+   - **Masa gratis** (menit): parkir sampai batas ini tidak dikenai biaya.
+   - **Tarif jam pertama** (mode per jam): jam pertama boleh berbeda dari jam berikutnya.
+   - **Tarif maksimum per hari** (mode per jam): tiap 24 jam dibatasi maksimal sekian rupiah.
+   Semua opsional; nilai default tidak mengubah perhitungan lama. Seluruh aturan ada di `backend/services/tarifService.js`.
+4. **Preview biaya dari backend** — modal "Proses Kendaraan Keluar" memanggil `GET /api/parkir/:id/preview`, jadi angka yang tampil sama persis dengan yang disimpan (sebelumnya preview di frontend selalu memakai tarif flat).
+5. **Metode pembayaran** — tunai / QRIS / transfer. Untuk tunai, petugas bisa mengisi uang diterima dan kembalian dihitung otomatis. Tercetak di struk.
+6. **Email reset password** — konfigurasi di `backend/.env` (lihat `backend/.env.example`):
+
+   ```env
+   FRONTEND_URL=http://localhost:5173
+   SMTP_HOST=smtp.gmail.com
+   SMTP_PORT=587
+   SMTP_SECURE=false
+   SMTP_USER=emailmu@gmail.com
+   SMTP_PASS=app_password_gmail
+   SMTP_FROM="Sistem Parkir <emailmu@gmail.com>"
+   ```
+
+   Untuk Gmail gunakan *App Password*, bukan password akun.
+7. **Connection pool MySQL** — `backend/config/db.js` memakai `createPool` sehingga koneksi yang terputus otomatis dibuat ulang.
+
 ## Dokumentasi Skema Database
 
 Database terdiri dari 4 tabel utama dengan relasi sebagai berikut:
@@ -107,8 +161,9 @@ Semua endpoint (kecuali `register` dan `login`) wajib menyertakan header:
 |---|---|---|---|
 | GET | `/api/parkir` | – | `200` array data parkir (join kendaraan + jenis) |
 | POST | `/api/parkir` | `{ "kendaraan_id", "waktu_masuk" }` | `201` `{ "message" }` |
-| PUT | `/api/parkir/:id` | `{ "waktu_keluar" }` (opsional) | `200` `{ "message", "data": {...biaya dihitung otomatis} }` |
+| PUT | `/api/parkir/:id` | `{ "waktu_keluar"?, "metode_bayar"? ("tunai"\|"qris"\|"transfer"), "uang_diterima"? }` | `200` `{ "message", "data": {...biaya, metode_bayar, uang_diterima, kembalian} }` |
 | DELETE | `/api/parkir/:id` | – | `200` `{ "message" }` |
+| GET | `/api/parkir/:id/preview?waktu_keluar=YYYY-MM-DD HH:mm:ss` | – | `200` `{ total_menit, durasi, biaya, gratis }` |
 
 ### Dashboard — `/api/dashboard` 🔒
 | Method | Endpoint | Respons |
@@ -129,6 +184,14 @@ Semua endpoint (kecuali `register` dan `login`) wajib menyertakan header:
 | PUT | `/api/profile` | `{ "nama", "email" }` | `{ "message" }` |
 | PUT | `/api/profile/password` | `{ "password_lama", "password_baru" }` | `{ "message" }` |
 | POST | `/api/profile/foto` | form-data `foto` (file) | `{ "message", "foto" }` |
+
+### Admin — `/api/admin` 🔒 (khusus admin)
+| Method | Endpoint | Keterangan |
+|---|---|---|
+| GET | `/api/admin/users` | Daftar semua user |
+| PUT | `/api/admin/users/:id/role` | Ubah role user |
+| PUT | `/api/admin/users/:id/status` | Aktif/nonaktifkan akun |
+| GET | `/api/admin/audit-log?page=&limit=&q=` | Riwayat aksi penting (paginasi + pencarian) |
 
 ## Cara Menjalankan Aplikasi Secara Lokal
 
@@ -155,5 +218,27 @@ Buka `http://localhost:5173`, registrasi akun baru lewat halaman register, lalu 
 
 ## Environment Variables
 
-Lihat `backend/.env.example` untuk daftar variabel yang dibutuhkan (koneksi database, port, dan JWT secret).
+Lihat `backend/.env.example` untuk daftar variabel yang dibutuhkan (koneksi database, port, JWT secret, URL frontend, dan SMTP untuk email reset password).
 
+
+## Update: Kamera Pengenal Plat & Cetak Struk Asli
+
+1. **Isi dari Kamera (halaman Kendaraan)** — saat menambah kendaraan, tombol "Isi dari Kamera" mengambil foto lalu backend mengenali **plat nomor, warna, dan jenis** lewat model vision Claude (`POST /api/anpr/scan`) dan mengisikannya ke form. Nama pemilik tetap diisi manual, dan semua kolom bisa dikoreksi sebelum menekan Simpan. Peringatan muncul kalau plat sudah terdaftar atau keyakinan bacaan rendah.
+2. **Cetak struk asli ke printer** — tombol "Cetak Tiket" / "Cetak Struk" sekarang langsung memanggil printer dengan layout kertas thermal 80 mm (QR tiket ikut tercetak), bukan mengunduh PDF. PDF tetap tersedia lewat tombol "PDF" / "Unduh PDF". Kotak "Cetak otomatis" mencetak tiket saat kendaraan masuk dan struk saat keluar.
+
+### Konfigurasi
+
+Backend (`backend/.env`):
+
+```
+ANTHROPIC_API_KEY=sk-ant-...      # wajib untuk fitur kamera
+ANPR_MODEL=claude-sonnet-5-5      # opsional
+```
+
+Frontend (`frontend/.env`, opsional): `VITE_LEBAR_STRUK=58` untuk kertas 58 mm (default 80), `VITE_NAMA_USAHA` untuk judul struk.
+
+### Printer thermal
+
+1. Install driver printer thermal (mis. Epson TM-T82 / Xprinter / POS-58) dan jadikan **printer default** di sistem operasi.
+2. Agar tidak muncul dialog cetak setiap transaksi, jalankan Chrome/Edge dengan flag `--kiosk-printing` (Windows: tambahkan di shortcut browser, contoh `chrome.exe --kiosk-printing http://localhost:5173`). Tanpa flag ini struk tetap tercetak, hanya perlu menekan "Print" sekali per transaksi.
+3. Kamera di browser hanya bisa dipakai lewat `https://` atau `http://localhost`.

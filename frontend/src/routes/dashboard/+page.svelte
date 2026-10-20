@@ -12,20 +12,18 @@
     import PieChart from "../../lib/charts/PieChart.svelte";
     import LineChart from "../../lib/charts/LineChart.svelte";
 
-    import {
-        CarFront,
-        SquareParking,
-        CircleCheckBig,
-        LogOut,
-        CalendarDays,
-        CalendarRange,
-        Wallet,
-        Banknote,
-        TrendingUp,
-        Car,
-        CircleCheck,
-        Receipt
-    } from "lucide-svelte";
+    import CarFront from "lucide-svelte/icons/car-front";
+    import SquareParking from "lucide-svelte/icons/square-parking";
+    import CircleCheckBig from "lucide-svelte/icons/circle-check-big";
+    import LogOut from "lucide-svelte/icons/log-out";
+    import CalendarDays from "lucide-svelte/icons/calendar-days";
+    import CalendarRange from "lucide-svelte/icons/calendar-range";
+    import Wallet from "lucide-svelte/icons/wallet";
+    import Banknote from "lucide-svelte/icons/banknote";
+    import TrendingUp from "lucide-svelte/icons/trending-up";
+    import Car from "lucide-svelte/icons/car";
+    import CircleCheck from "lucide-svelte/icons/circle-check";
+    import Receipt from "lucide-svelte/icons/receipt";
 
     let dashboard = $state({
         total_kendaraan: 0,
@@ -53,27 +51,31 @@
         totalTransactions: 0
     });
 
+    let slots = $state([]);
+
     let loading = $state(true);
 
     async function loadDashboard() {
 
         try {
-            const [dashboardRes, analyticsRes, revenueRes] = await Promise.all([
+            const [dashboardRes, analyticsRes, revenueRes, slotsRes] = await Promise.all([
                 apiFetch("/dashboard"),
                 apiFetch("/dashboard/analytics"),
-                apiFetch("/dashboard/revenue")
+                apiFetch("/dashboard/revenue"),
+                apiFetch("/dashboard/slots")
             ]);
 
             // apiFetch mengembalikan null kalau tidak ada token atau
             // token expired (401) — redirect ke login sudah ditangani
             // otomatis di dalam apiFetch.
-            if (!dashboardRes || !analyticsRes || !revenueRes) {
+            if (!dashboardRes || !analyticsRes || !revenueRes || !slotsRes) {
                 return;
             }
 
             dashboard = await dashboardRes.json();
             analytics = await analyticsRes.json();
             revenue = await revenueRes.json();
+            slots = await slotsRes.json();
 
         } catch (error) {
             console.error(error);
@@ -166,6 +168,54 @@
                 />
 
             </div>
+
+            <!-- Kapasitas / Slot Parkir per jenis kendaraan -->
+            {#if slots.length > 0}
+            <div class="rounded-2xl p-6 bg-white shadow-md fade-in-up" style="animation-delay:60ms">
+
+                <h3 class="slot-title">
+                    <SquareParking size={20}/>
+                    Kapasitas Slot Parkir
+                </h3>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 slot-grid">
+
+                    {#each slots as s}
+
+                        <div class="slot-card" class:penuh={!s.unlimited && s.sisa === 0}>
+
+                            <p class="slot-nama">{s.nama_jenis}</p>
+
+                            {#if s.unlimited}
+
+                                <p class="slot-jumlah">{s.terisi} <span>terisi</span></p>
+                                <p class="slot-sub">Tidak dibatasi</p>
+
+                            {:else}
+
+                                <p class="slot-jumlah">{s.terisi}<span>/{s.kapasitas}</span></p>
+
+                                <div class="slot-bar">
+                                    <div
+                                        class="slot-bar-fill"
+                                        style="width:{Math.min(100, (s.terisi / s.kapasitas) * 100)}%"
+                                    ></div>
+                                </div>
+
+                                <p class="slot-sub">
+                                    {s.sisa === 0 ? "Penuh" : `Sisa ${s.sisa} slot`}
+                                </p>
+
+                            {/if}
+
+                        </div>
+
+                    {/each}
+
+                </div>
+
+            </div>
+            {/if}
 
             <!-- Pendapatan -->
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -301,5 +351,75 @@
         opacity:1;
         transform: translateY(0);
     }
+}
+
+.slot-title{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:16px;
+    font-weight:700;
+    color:#0f172a;
+    margin-bottom:16px;
+}
+
+.slot-grid{
+    margin-top:4px;
+}
+
+.slot-card{
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-radius:14px;
+    padding:16px;
+}
+
+.slot-card.penuh{
+    background:#fef2f2;
+    border-color:#fecaca;
+}
+
+.slot-nama{
+    font-size:13px;
+    font-weight:600;
+    color:#64748b;
+    margin-bottom:6px;
+}
+
+.slot-jumlah{
+    font-size:22px;
+    font-weight:800;
+    color:#0f172a;
+}
+
+.slot-jumlah span{
+    font-size:14px;
+    font-weight:600;
+    color:#94a3b8;
+}
+
+.slot-bar{
+    width:100%;
+    height:6px;
+    background:#e2e8f0;
+    border-radius:999px;
+    margin:8px 0;
+    overflow:hidden;
+}
+
+.slot-bar-fill{
+    height:100%;
+    background:#2563eb;
+    border-radius:999px;
+    transition:width .4s ease;
+}
+
+.penuh .slot-bar-fill{
+    background:#dc2626;
+}
+
+.slot-sub{
+    font-size:12px;
+    color:#64748b;
 }
 </style>

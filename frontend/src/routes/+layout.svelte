@@ -7,13 +7,17 @@
 
 	let { children } = $props();
 
-	// Halaman login ("/") dan register ("/register") tidak memakai
-	// Sidebar & Navbar. Karena Sidebar & Navbar dipasang di sini (bukan
-	// di tiap +page.svelte), keduanya hanya dibuat sekali selama sesi
-	// berjalan sehingga animasi masuknya cuma tampil sekali saat pertama
-	// kali login, bukan setiap kali pindah menu.
+	// Halaman-halaman auth (login, register, lupa/reset password) tidak
+	// memakai Sidebar & Navbar, karena usernya belum login dan halaman
+	// ini didesain full-page (background gradient, card di tengah),
+	// bukan sebagai konten di dalam layout dashboard. Sebelumnya hanya
+	// "/" dan "/register" yang dikecualikan, sehingga "/forgot-password"
+	// dan "/reset-password" ikut dibungkus Sidebar & Navbar dan tampil
+	// rusak/dobel untuk user yang belum login.
 	let isAuthPage = $derived(
-		page.url.pathname === '/' || page.url.pathname === '/register'
+		['/', '/register', '/forgot-password', '/reset-password'].includes(
+			page.url.pathname
+		)
 	);
 </script>
 

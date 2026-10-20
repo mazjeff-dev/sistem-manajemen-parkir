@@ -2,7 +2,10 @@
     import { onMount } from "svelte";
     import { goto } from "$app/navigation";
     import { page } from "$app/state";
-    import { Bell, UserCircle2, CarFront, LogOut } from "lucide-svelte";
+    import Bell from "lucide-svelte/icons/bell";
+    import UserCircle2 from "lucide-svelte/icons/user-circle-2";
+    import CarFront from "lucide-svelte/icons/car-front";
+    import LogOut from "lucide-svelte/icons/log-out";
     import { SERVER_URL, apiFetch } from "../services/api.js";
     import { profileInfo } from "../stores/profile.js";
 
@@ -16,6 +19,8 @@
         "/kendaraan": "Manajemen Data Kendaraan",
         "/parkir": "Manajemen Data Parkir",
         "/laporan": "Laporan Parkir",
+        "/admin/users": "Kelola User",
+        "/admin/audit": "Audit Log",
         "/profile": "Pengaturan Profil"
     };
 

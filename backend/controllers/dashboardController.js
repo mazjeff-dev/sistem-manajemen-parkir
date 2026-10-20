@@ -112,6 +112,63 @@ exports.dashboard = (req, res) => {
 };
 
 // ===========================
+// SLOT PARKIR (untuk Card "Kapasitas Parkir" di Dashboard)
+// Menampilkan, per jenis kendaraan: kapasitas yang diatur admin,
+// jumlah slot yang sedang terisi (status = 'Parkir'), dan sisa
+// slot. Jenis dengan kapasitas NULL/0 dianggap tidak dibatasi.
+// ===========================
+exports.slots = async (req, res) => {
+
+    try {
+
+        const rows = await queryAsync(
+            `SELECT
+                jenis_kendaraan.id,
+                jenis_kendaraan.nama_jenis,
+                jenis_kendaraan.kapasitas,
+                COALESCE(terisi.jumlah, 0) AS terisi
+            FROM jenis_kendaraan
+            LEFT JOIN (
+                SELECT
+                    kendaraan.jenis_id,
+                    COUNT(*) AS jumlah
+                FROM parkir
+                JOIN kendaraan ON parkir.kendaraan_id = kendaraan.id
+                WHERE parkir.status = 'Parkir'
+                GROUP BY kendaraan.jenis_id
+            ) AS terisi ON terisi.jenis_id = jenis_kendaraan.id`
+        );
+
+        const hasil = rows.map((row) => {
+
+            const kapasitas = row.kapasitas === null ? null : Number(row.kapasitas);
+            const terisi = Number(row.terisi);
+
+            return {
+                id: row.id,
+                nama_jenis: row.nama_jenis,
+                kapasitas,
+                terisi,
+                sisa: kapasitas === null || kapasitas === 0 ? null : Math.max(0, kapasitas - terisi),
+                unlimited: kapasitas === null || kapasitas === 0
+            };
+
+        });
+
+        res.json(hasil);
+
+    } catch (err) {
+
+        console.error(err);
+        res.status(500).json({
+            message: "Terjadi kesalahan pada server"
+        });
+
+    }
+
+};
+
+// ===========================
 // ANALYTICS (untuk Dashboard Analytics)
 // Bar chart, Pie chart, Line chart, Ringkasan, Recent Activity
 // ===========================

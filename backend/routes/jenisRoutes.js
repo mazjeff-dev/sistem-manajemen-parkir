@@ -2,18 +2,16 @@ const express = require("express");
 const router = express.Router();
 
 const jenisController = require("../controllers/jenisController");
-const verifyToken = require("../middleware/authMiddleware");
+const { verifyToken, requireAdmin } = require("../middleware/authMiddleware");
 
-// GET semua jenis kendaraan
+// GET semua jenis kendaraan — semua role boleh melihat (dipakai
+// juga sebagai dropdown saat input kendaraan).
 router.get("/", verifyToken, jenisController.getJenis);
 
-// POST tambah jenis kendaraan
-router.post("/", verifyToken, jenisController.createJenis);
-
-// PUT update jenis kendaraan
-router.put("/:id", verifyToken, jenisController.updateJenis);
-
-// DELETE hapus jenis kendaraan
-router.delete("/:id", verifyToken, jenisController.deleteJenis);
+// Tambah/ubah/hapus jenis kendaraan (termasuk kapasitas & tarif)
+// dibatasi khusus admin.
+router.post("/", verifyToken, requireAdmin, jenisController.createJenis);
+router.put("/:id", verifyToken, requireAdmin, jenisController.updateJenis);
+router.delete("/:id", verifyToken, requireAdmin, jenisController.deleteJenis);
 
 module.exports = router;

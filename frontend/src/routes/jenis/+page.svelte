@@ -2,12 +2,22 @@
 
 import { onMount } from "svelte";
 import { apiFetch } from "../../services/api.js";
+import { role } from "../../stores/auth.js";
 
-import { Plus, Pencil, Trash2, Search } from "lucide-svelte";
+import Plus from "lucide-svelte/icons/plus";
+import Pencil from "lucide-svelte/icons/pencil";
+import Trash2 from "lucide-svelte/icons/trash-2";
+import Search from "lucide-svelte/icons/search";
 
 
 let jenis = $state([]);
 let search = $state("");
+
+// Hanya admin yang boleh menambah/mengubah/menghapus jenis kendaraan
+// (kapasitas & tarif). Backend juga sudah memproteksi endpoint ini,
+// tapi UI disesuaikan juga supaya petugas tidak melihat tombol yang
+// pasti akan ditolak server.
+let isAdmin = $derived($role === "admin");
 
 let filteredJenis = $derived(
     jenis.filter((item) =>
@@ -19,6 +29,12 @@ let filteredJenis = $derived(
 let showModal = $state(false);
 let namaJenis = $state("");
 let tarif = $state("");
+let kapasitas = $state("");
+let modeTarif = $state("flat");
+let tarifPerJam = $state("");
+let gratisMenit = $state("");
+let tarifJamPertama = $state("");
+let tarifMaksHarian = $state("");
 let editMode = $state(false);
 let selectedId = $state(null);
 let showDeleteModal = $state(false);
@@ -77,7 +93,13 @@ async function tambahJenis() {
 
             body: JSON.stringify({
                 nama_jenis: namaJenis,
-                tarif: tarif
+                tarif: tarif,
+                kapasitas: kapasitas,
+                mode_tarif: modeTarif,
+                tarif_per_jam: tarifPerJam,
+                gratis_menit: gratisMenit,
+                tarif_jam_pertama: tarifJamPertama,
+                tarif_maks_harian: tarifMaksHarian
             })
 
         });
@@ -95,6 +117,12 @@ async function tambahJenis() {
 
         namaJenis = "";
         tarif = "";
+        kapasitas = "";
+        modeTarif = "flat";
+        tarifPerJam = "";
+        gratisMenit = "";
+        tarifJamPertama = "";
+        tarifMaksHarian = "";
 
         showModal = false;
 
@@ -124,6 +152,18 @@ function bukaEdit(item) {
 
     tarif = item.tarif;
 
+    kapasitas = item.kapasitas ?? "";
+
+    modeTarif = item.mode_tarif || "flat";
+
+    tarifPerJam = item.tarif_per_jam ?? "";
+
+    gratisMenit = item.gratis_menit ?? "";
+
+    tarifJamPertama = item.tarif_jam_pertama ?? "";
+
+    tarifMaksHarian = item.tarif_maks_harian ?? "";
+
 }
 
 async function updateJenis() {
@@ -148,7 +188,19 @@ async function updateJenis() {
 
                     nama_jenis:namaJenis,
 
-                    tarif:tarif
+                    tarif:tarif,
+
+                    kapasitas:kapasitas,
+
+                    mode_tarif:modeTarif,
+
+                    tarif_per_jam:tarifPerJam,
+
+                    gratis_menit:gratisMenit,
+
+                    tarif_jam_pertama:tarifJamPertama,
+
+                    tarif_maks_harian:tarifMaksHarian
 
                 })
 
@@ -175,6 +227,15 @@ async function updateJenis() {
         namaJenis = "";
 
         tarif = "";
+
+        kapasitas = "";
+
+        modeTarif = "flat";
+
+        tarifPerJam = "";
+        gratisMenit = "";
+        tarifJamPertama = "";
+        tarifMaksHarian = "";
 
         selectedId = null;
 
@@ -284,17 +345,25 @@ onMount(() => {
                     placeholder="🔍 Cari jenis kendaraan..."
                 />
 
+                {#if isAdmin}
                 <button
                     onclick={() => {
                         editMode = false;
                         selectedId = null;
                         namaJenis = "";
                         tarif = "";
+                        kapasitas = "";
+                        modeTarif = "flat";
+                        tarifPerJam = "";
+                        gratisMenit = "";
+                        tarifJamPertama = "";
+                        tarifMaksHarian = "";
                         showModal = true;
                     }}
                 >
                     + Tambah Jenis
                 </button>
+                {/if}
 
             </div>
 
@@ -319,9 +388,11 @@ onMount(() => {
 
                         <th>Nama Jenis</th>
 
-                        <th>Tarif Parkir</th>
+                        <th>Tarif</th>
 
-                        <th>Aksi</th>
+                        <th>Kapasitas</th>
+
+                        {#if isAdmin}<th>Aksi</th>{/if}
 
                         </tr>
 
@@ -333,7 +404,7 @@ onMount(() => {
 
                 <tr>
 
-                    <td colspan="4" class="empty">
+                    <td colspan="5" class="empty">
 
                         Data tidak ditemukan
 
@@ -351,8 +422,34 @@ onMount(() => {
 
                     <td>{item.nama_jenis}</td>
 
-                    <td>{formatRupiah(item.tarif)}</td>
+                    <td>
+                        {#if item.mode_tarif === "per_jam"}
+                            {formatRupiah(item.tarif_per_jam)}/jam
+                        {:else}
+                            {formatRupiah(item.tarif)} (flat)
+                        {/if}
+                        {#if item.gratis_menit > 0 || (item.mode_tarif === "per_jam" && (item.tarif_jam_pertama !== null || item.tarif_maks_harian !== null))}
+                            <div class="aturan-tarif">
+                                {#if item.gratis_menit > 0}Gratis {item.gratis_menit} menit{/if}
+                                {#if item.mode_tarif === "per_jam" && item.tarif_jam_pertama !== null}
+                                    &middot; Jam 1: {formatRupiah(item.tarif_jam_pertama)}
+                                {/if}
+                                {#if item.mode_tarif === "per_jam" && item.tarif_maks_harian !== null}
+                                    &middot; Maks {formatRupiah(item.tarif_maks_harian)}/hari
+                                {/if}
+                            </div>
+                        {/if}
+                    </td>
 
+                    <td>
+                        {#if item.kapasitas}
+                            {item.terisi ?? 0}/{item.kapasitas} slot
+                        {:else}
+                            Tidak dibatasi
+                        {/if}
+                    </td>
+
+                    {#if isAdmin}
                     <td>
 
                         <button class="edit" onclick={() => bukaEdit(item)}>
@@ -366,6 +463,7 @@ onMount(() => {
                         </button>
 
                     </td>
+                    {/if}
 
                 </tr>
 
@@ -458,8 +556,64 @@ onMount(() => {
                     min="0"
                     step="500"
                     bind:value={tarif}
-                    placeholder="Tarif parkir (Rp)"
+                    placeholder="Tarif flat (Rp) — dipakai jika mode tarif = Flat"
                     >
+
+                    <label class="field-label" for="tarif-select">Mode Tarif</label>
+                    <select id="tarif-select" bind:value={modeTarif}>
+                        <option value="flat">Flat (tarif tetap per transaksi)</option>
+                        <option value="per_jam">Per Jam (dihitung dari lama parkir)</option>
+                    </select>
+
+                    {#if modeTarif === "per_jam"}
+                        <input
+                        type="number"
+                        min="0"
+                        step="500"
+                        bind:value={tarifPerJam}
+                        placeholder="Tarif per jam (Rp)"
+                        >
+
+                        <label class="field-label" for="jam-pertama-input">Tarif Jam Pertama (opsional, kosong = sama dengan tarif per jam)</label>
+                        <input
+                            id="jam-pertama-input"
+                            type="number"
+                            min="0"
+                            step="500"
+                            bind:value={tarifJamPertama}
+                            placeholder="Contoh: 5000"
+                        />
+
+                        <label class="field-label" for="maks-harian-input">Tarif Maksimum per Hari (opsional, kosong = tanpa batas)</label>
+                        <input
+                            id="maks-harian-input"
+                            type="number"
+                            min="1"
+                            step="500"
+                            bind:value={tarifMaksHarian}
+                            placeholder="Contoh: 20000"
+                        />
+                    {/if}
+
+                    <label class="field-label" for="gratis-input">Masa Gratis (menit, kosong = tidak ada)</label>
+                    <input
+                        id="gratis-input"
+                        type="number"
+                        min="0"
+                        step="1"
+                        bind:value={gratisMenit}
+                        placeholder="Contoh: 15"
+                    />
+
+                    <label class="field-label" for="kapasitas-input">Kapasitas Slot (kosongkan = tidak dibatasi)</label>
+                    <input
+                        id="kapasitas-input"
+                        type="number"
+                        min="0"
+                        step="1"
+                        bind:value={kapasitas}
+                        placeholder="Contoh: 20"
+                    />
 
                     <div class="action">
 
@@ -471,6 +625,12 @@ onMount(() => {
                                 selectedId = null;
                                 namaJenis = "";
                                 tarif = "";
+                                kapasitas = "";
+                                modeTarif = "flat";
+                                tarifPerJam = "";
+                                gratisMenit = "";
+                                tarifJamPertama = "";
+                                tarifMaksHarian = "";
 
                             }}
                         >
@@ -735,7 +895,8 @@ tr:hover{
 
 }
 
-.modal-content input{
+.modal-content input,
+.modal-content select{
 
     width:100%;
 
@@ -746,6 +907,24 @@ tr:hover{
     border:1px solid #ddd;
 
     border-radius:10px;
+
+    font-family:inherit;
+
+    font-size:14px;
+
+}
+
+.field-label{
+
+    display:block;
+
+    margin-top:14px;
+
+    font-size:13px;
+
+    font-weight:600;
+
+    color:#475569;
 
 }
 
@@ -980,4 +1159,10 @@ color:#2563eb;
 
 }
 
+
+.aturan-tarif{
+    margin-top: 2px;
+    font-size: 12px;
+    color: #64748b;
+}
 </style>

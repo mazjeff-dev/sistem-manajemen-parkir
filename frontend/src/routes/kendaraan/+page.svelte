@@ -3,20 +3,28 @@
 import { onMount } from "svelte";
 import { apiFetch } from "../../services/api.js";
 
-import { Plus, Pencil, Trash2 } from "lucide-svelte";
+import Plus from "lucide-svelte/icons/plus";
+import Pencil from "lucide-svelte/icons/pencil";
+import Trash2 from "lucide-svelte/icons/trash-2";
+import Camera from "lucide-svelte/icons/camera";
+import KameraPlat from "../../lib/KameraPlat.svelte";
 
 let kendaraan = $state([]);
 let jenisList = $state([]);
 let search = $state("");
 
-let filteredKendaraan = $derived(
-    kendaraan.filter((item) =>
-        item.plat_nomor.toLowerCase().includes(search.toLowerCase()) ||
-        item.nama_pemilik.toLowerCase().includes(search.toLowerCase())
-    )
-);
+// Pencarian & pagination sekarang dilakukan di server (bukan lagi
+// filter di browser), supaya tetap ringan walau data kendaraan
+// sudah banyak. Ganti "search" akan otomatis kembali ke halaman 1
+// dan memuat ulang data lewat loadKendaraan().
+let currentPage = $state(1);
+let totalPages = $state(1);
+let totalData = $state(0);
+const pageLimit = 10;
+let searchDebounce;
 
 let showModal = $state(false);
+let showKamera = $state(false);
 let platNomor = $state("");
 let namaPemilik = $state("");
 let warna = $state("");
@@ -35,19 +43,29 @@ let toast = $state({
 });
 let loading = $state(true);
 
-async function loadKendaraan() {
+async function loadKendaraan(page = currentPage) {
 
     loading = true;
 
     try {
 
-        const response = await apiFetch("/kendaraan");
+        const params = new URLSearchParams({
+            page: String(page),
+            limit: String(pageLimit)
+        });
+
+        if (search.trim()) params.set("q", search.trim());
+
+        const response = await apiFetch(`/kendaraan?${params.toString()}`);
 
         if (!response) return;
 
         const data = await response.json();
 
-        kendaraan = [...data];
+        kendaraan = [...data.data];
+        currentPage = data.page;
+        totalPages = data.totalPages;
+        totalData = data.total;
 
     } catch (err) {
 
@@ -59,6 +77,23 @@ async function loadKendaraan() {
         loading = false;
 
     }
+
+}
+
+function handleSearchInput() {
+
+    clearTimeout(searchDebounce);
+
+    searchDebounce = setTimeout(() => {
+        loadKendaraan(1);
+    }, 350);
+
+}
+
+function gantiHalaman(page) {
+
+    if (page < 1 || page > totalPages || page === currentPage) return;
+    loadKendaraan(page);
 
 }
 
@@ -105,6 +140,49 @@ function validasiForm() {
     }
 
     return true;
+
+}
+
+// Kata kunci nama jenis di database untuk tiap jenis hasil deteksi kamera.
+const PETA_JENIS = {
+    motor: ["motor", "sepeda"],
+    mobil: ["mobil", "minibus", "sedan", "suv", "pickup"],
+    truk: ["truk", "truck", "pickup"],
+    bus: ["bus"]
+};
+
+function cariJenisId(hint) {
+
+    for (const kata of PETA_JENIS[hint] || []) {
+        const ketemu = jenisList.find((j) => String(j.nama_jenis).toLowerCase().includes(kata));
+        if (ketemu) return ketemu.id;
+    }
+
+    return "";
+
+}
+
+// Mengisi form dari hasil kamera. Nama pemilik tidak bisa dikenali
+// kamera, jadi tetap diisi manual.
+function isiDariKamera(hasil) {
+
+    showKamera = false;
+
+    if (hasil.plat_nomor) platNomor = hasil.plat_nomor;
+    if (hasil.warna) warna = hasil.warna;
+
+    const jenis = cariJenisId(hasil.jenis);
+    if (jenis) jenisId = jenis;
+
+    if (hasil.kendaraan) {
+        showToast(`Plat ${hasil.plat_nomor} sudah terdaftar atas nama ${hasil.kendaraan.nama_pemilik}`, "error");
+    } else if (!hasil.plat_nomor) {
+        showToast("Plat tidak terbaca, isi plat nomor manual", "error");
+    } else if (hasil.keyakinan < 0.7) {
+        showToast("Keyakinan rendah, periksa plat nomor sebelum menyimpan", "error");
+    } else {
+        showToast("Plat dan warna terisi dari kamera");
+    }
 
 }
 
@@ -318,7 +396,7 @@ onMount(() => {
 
             <p class="total-data">
                 Total Data :
-                <b>{filteredKendaraan.length}</b>
+                <b>{totalData}</b>
             </p>
 
             <div class="toolbar">
@@ -326,6 +404,7 @@ onMount(() => {
                 <input
                     type="text"
                     bind:value={search}
+                    oninput={handleSearchInput}
                     placeholder="🔍 Cari plat nomor / pemilik..."
                 />
 
@@ -359,7 +438,7 @@ onMount(() => {
 
                 <tbody>
 
-                {#if filteredKendaraan.length === 0}
+                {#if kendaraan.length === 0}
 
                 <tr>
                     <td colspan="6" class="empty">
@@ -369,10 +448,10 @@ onMount(() => {
 
                 {:else}
 
-                {#each filteredKendaraan as item, index}
+                {#each kendaraan as item, index}
 
                 <tr class="row-anim" style="animation-delay:{index * 0.05}s">
-                    <td>{index + 1}</td>
+                    <td>{(currentPage - 1) * pageLimit + index + 1}</td>
                     <td>{item.plat_nomor}</td>
                     <td>{item.nama_pemilik}</td>
                     <td>{item.warna}</td>
@@ -399,6 +478,18 @@ onMount(() => {
                 </tbody>
 
             </table>
+
+            {#if totalPages > 1}
+                <div class="pagination">
+                    <button onclick={() => gantiHalaman(currentPage - 1)} disabled={currentPage === 1}>
+                        &laquo; Sebelumnya
+                    </button>
+                    <span class="page-info">Halaman {currentPage} dari {totalPages}</span>
+                    <button onclick={() => gantiHalaman(currentPage + 1)} disabled={currentPage === totalPages}>
+                        Berikutnya &raquo;
+                    </button>
+                </div>
+            {/if}
 
             {#if showDeleteModal}
 
@@ -447,6 +538,13 @@ onMount(() => {
                         {editMode ? "Edit Kendaraan" : "Tambah Kendaraan"}
                     </h2>
 
+                    {#if !editMode}
+                        <button type="button" class="kamera-isi" onclick={() => showKamera = true}>
+                            <Camera size={16}/>
+                            Isi dari Kamera
+                        </button>
+                    {/if}
+
                     <input
                         type="text"
                         bind:value={platNomor}
@@ -494,6 +592,10 @@ onMount(() => {
 
             {/if}
 
+            {#if showKamera}
+                <KameraPlat onhasil={isiDariKamera} ontutup={() => showKamera = false} />
+            {/if}
+
             {#if toast.show}
 
                 <div class="toast {toast.type}">
@@ -507,6 +609,26 @@ onMount(() => {
 </div>
 
 <style>
+
+.kamera-isi{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    width:100%;
+    margin-top:18px;
+    padding:11px;
+    background:#2563eb;
+    color:white;
+    border:0;
+    border-radius:10px;
+    cursor:pointer;
+    font-size:14px;
+}
+
+.kamera-isi:hover{
+    background:#1d4ed8;
+}
 
 .page{
     padding:35px;
@@ -737,6 +859,41 @@ tr:hover{
         opacity:1;
         transform:translateX(0);
     }
+}
+
+.pagination{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:16px;
+    margin-top:18px;
+}
+
+.pagination button{
+    padding:8px 16px;
+    border:1px solid #dbe3ef;
+    background:white;
+    border-radius:8px;
+    cursor:pointer;
+    font-size:14px;
+    color:#334155;
+    transition:.2s;
+}
+
+.pagination button:hover:not(:disabled){
+    background:#2563eb;
+    color:white;
+    border-color:#2563eb;
+}
+
+.pagination button:disabled{
+    opacity:.5;
+    cursor:not-allowed;
+}
+
+.page-info{
+    font-size:14px;
+    color:#64748b;
 }
 
 .toolbar{

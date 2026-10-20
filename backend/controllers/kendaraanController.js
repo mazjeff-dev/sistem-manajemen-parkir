@@ -1,8 +1,6 @@
 const db = require("../config/db");
 
-// =======================
 // CREATE
-// =======================
 exports.createKendaraan = (req, res) => {
 
     const {
@@ -18,9 +16,6 @@ exports.createKendaraan = (req, res) => {
         });
     }
 
-    // Normalisasi plat nomor: hapus spasi berlebih di awal/akhir dan
-    // seragamkan jadi huruf kapital, supaya "b 1234 xyz" dan
-    // "B 1234 XYZ" dianggap plat yang sama saat dicek duplikat.
     const platNomorClean = String(plat_nomor).trim().toUpperCase();
 
     if (platNomorClean.length === 0) {
@@ -29,7 +24,6 @@ exports.createKendaraan = (req, res) => {
         });
     }
 
-    // Cegah plat nomor yang sama terdaftar dua kali sebagai kendaraan berbeda
     db.query(
         "SELECT id FROM kendaraan WHERE UPPER(plat_nomor) = ?",
         [platNomorClean],
@@ -74,40 +68,73 @@ exports.createKendaraan = (req, res) => {
 
 };
 
-// =======================
-// READ
-// =======================
+// READ (server-side pagination & search)
+// Query params opsional: page (default 1), limit (default 10), q (cari plat/nama)
 exports.getKendaraan = (req, res) => {
 
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.max(1, Math.min(100, parseInt(req.query.limit) || 10));
+    const offset = (page - 1) * limit;
+    const q = (req.query.q || "").trim();
+
+    const whereClause = q ? `WHERE kendaraan.plat_nomor LIKE ? OR kendaraan.nama_pemilik LIKE ?` : "";
+    const whereParams = q ? [`%${q}%`, `%${q}%`] : [];
+
     db.query(
-        `SELECT
-            kendaraan.id,
-            kendaraan.plat_nomor,
-            kendaraan.nama_pemilik,
-            kendaraan.warna,
-            jenis_kendaraan.nama_jenis
-        FROM kendaraan
-        JOIN jenis_kendaraan
-        ON kendaraan.jenis_id = jenis_kendaraan.id`,
-        (err, result) => {
+        `SELECT COUNT(*) AS total FROM kendaraan ${whereClause}`,
+        whereParams,
+        (err, countResult) => {
 
             if (err) {
-                console.error("[getKendaraan]", err);
+                console.error("[getKendaraan] count:", err);
                 return res.status(500).json({
                     message: "Terjadi kesalahan pada server"
                 });
             }
 
-            res.json(result);
+            const total = countResult[0].total;
+
+            db.query(
+                `SELECT
+                    kendaraan.id,
+                    kendaraan.plat_nomor,
+                    kendaraan.nama_pemilik,
+                    kendaraan.warna,
+                    kendaraan.jenis_id,
+                    jenis_kendaraan.nama_jenis
+                FROM kendaraan
+                JOIN jenis_kendaraan
+                ON kendaraan.jenis_id = jenis_kendaraan.id
+                ${whereClause}
+                ORDER BY kendaraan.id DESC
+                LIMIT ? OFFSET ?`,
+                [...whereParams, limit, offset],
+                (err, result) => {
+
+                    if (err) {
+                        console.error("[getKendaraan]", err);
+                        return res.status(500).json({
+                            message: "Terjadi kesalahan pada server"
+                        });
+                    }
+
+                    res.json({
+                        data: result,
+                        total,
+                        page,
+                        limit,
+                        totalPages: Math.max(1, Math.ceil(total / limit))
+                    });
+
+                }
+            );
 
         }
     );
 
 };
 
-// =======================
 // UPDATE
-// =======================
 exports.updateKendaraan = (req, res) => {
 
     const { id } = req.params;
@@ -125,8 +152,6 @@ exports.updateKendaraan = (req, res) => {
         });
     }
 
-    // Normalisasi plat nomor dengan cara yang SAMA seperti di createKendaraan,
-    // supaya standar pengecekan duplikat konsisten di seluruh aplikasi.
     const platNomorClean = String(plat_nomor).trim().toUpperCase();
 
     if (platNomorClean.length === 0) {
@@ -135,9 +160,6 @@ exports.updateKendaraan = (req, res) => {
         });
     }
 
-    // Cek duplikat plat nomor terhadap kendaraan LAIN (bukan dirinya
-    // sendiri), supaya update tidak bentrok dengan kendaraan lain yang
-    // kebetulan sudah pakai plat nomor yang sama.
     db.query(
         "SELECT id FROM kendaraan WHERE UPPER(plat_nomor) = ? AND id != ?",
         [platNomorClean, id],
@@ -198,18 +220,11 @@ exports.updateKendaraan = (req, res) => {
 
 };
 
-// =======================
 // DELETE
-// =======================
 exports.deleteKendaraan = (req, res) => {
 
     const { id } = req.params;
 
-    // Cek dulu apakah kendaraan ini masih punya riwayat parkir.
-    // Sebelumnya kendaraan bisa langsung dihapus meskipun masih
-    // punya riwayat parkir terkait, yang bisa membuat data parkir
-    // "yatim" (kehilangan referensi kendaraan) atau membuat laporan
-    // jadi tidak akurat.
     db.query(
         "SELECT id FROM parkir WHERE kendaraan_id = ? LIMIT 1",
         [id],

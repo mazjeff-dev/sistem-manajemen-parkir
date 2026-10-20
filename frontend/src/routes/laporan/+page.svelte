@@ -3,20 +3,18 @@
 import { onMount } from "svelte";
 import { fetchLaporan } from "../../services/laporanService.js";
 
-import {
-    Search,
-    Filter,
-    RotateCcw,
-    Eye,
-    X,
-    Car,
-    ChevronLeft,
-    ChevronRight,
-    FileText,
-    FileDown,
-    FileSpreadsheet,
-    Printer
-} from "lucide-svelte";
+import Search from "lucide-svelte/icons/search";
+import Filter from "lucide-svelte/icons/filter";
+import RotateCcw from "lucide-svelte/icons/rotate-ccw";
+import Eye from "lucide-svelte/icons/eye";
+import X from "lucide-svelte/icons/x";
+import Car from "lucide-svelte/icons/car";
+import ChevronLeft from "lucide-svelte/icons/chevron-left";
+import ChevronRight from "lucide-svelte/icons/chevron-right";
+import FileText from "lucide-svelte/icons/file-text";
+import FileDown from "lucide-svelte/icons/file-down";
+import FileSpreadsheet from "lucide-svelte/icons/file-spreadsheet";
+import Printer from "lucide-svelte/icons/printer";
 
 // ===========================
 // State

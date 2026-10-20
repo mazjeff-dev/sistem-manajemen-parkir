@@ -1,26 +1,38 @@
 <script>
 
-import { onMount } from "svelte";
-import { goto } from "$app/navigation";
-import BASE_URL from "../../services/api.js";
-import { logout } from "../../stores/auth.js";
+import { onMount, onDestroy, tick } from "svelte";
+import { apiFetch } from "../../services/api.js";
 
-import { Plus, LogOut, Trash2 } from "lucide-svelte";
+import Plus from "lucide-svelte/icons/plus";
+import LogOut from "lucide-svelte/icons/log-out";
+import Trash2 from "lucide-svelte/icons/trash-2";
+import QrCode from "lucide-svelte/icons/qr-code";
+import Camera from "lucide-svelte/icons/camera";
+import { cetakStruk } from "../../services/cetakStruk.js";
 
 let parkir = $state([]);
 let kendaraanList = $state([]);
+
+// Pengaturan cetak otomatis tiket/struk ke printer saat transaksi selesai.
+let autoCetak = $state(true);
 let search = $state("");
 
-// Kendaraan yang boleh dipilih di modal "Tambah Parkir":
-// hanya yang belum punya entri parkir aktif (status "Parkir"),
-// supaya satu kendaraan tidak bisa dicatat masuk dua kali sekaligus.
-let kendaraanTersedia = $derived(
-    kendaraanList.filter((k) =>
-        !parkir.some(
-            (p) => p.plat_nomor === k.plat_nomor && p.status === "Parkir"
-        )
-    )
-);
+// Pencarian & pagination dilakukan di server, sama seperti halaman
+// Kendaraan, supaya tetap ringan walau riwayat parkir sudah banyak.
+let currentPage = $state(1);
+let totalPages = $state(1);
+let totalData = $state(0);
+const pageLimit = 10;
+let searchDebounce;
+
+// Kendaraan yang boleh dipilih di modal "Tambah Parkir". Karena
+// daftar riwayat parkir sekarang dipaginasi di server (tidak lagi
+// memuat semua data sekaligus), pengecekan "kendaraan mana yang
+// sedang aktif parkir" tidak bisa lagi dilakukan murni di frontend.
+// Backend tetap memvalidasi & menolak (dengan pesan error yang
+// jelas) kalau kendaraan yang dipilih ternyata masih berstatus
+// "Parkir" aktif, jadi seluruh daftar kendaraan ditampilkan di sini.
+let kendaraanTersedia = $derived(kendaraanList);
 
 let filteredParkir = $derived(
     parkir.filter((item) =>
@@ -34,36 +46,9 @@ function toDatetimeLocal(date) {
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-// ===========================
-// Tarif Parkir Otomatis (tetap per transaksi, bukan per jam)
-// Nilai ini hanya untuk PREVIEW di modal, tarif final
-// tetap dihitung ulang & divalidasi di backend.
-// Diutamakan pakai tarif_jenis (dari kolom jenis_kendaraan.tarif
-// yang bisa diatur di halaman Jenis Kendaraan). Pemetaan kata
-// kunci di bawah cuma fallback untuk data lama yang belum
-// diisi tarifnya.
-// ===========================
-const TARIF_PARKIR = {
-    motor: 2000,
-    mobil: 5000,
-    bus: 10000,
-    truk: 15000
-};
-
-function getTarifFallback(namaJenis) {
-    const nama = String(namaJenis || "").toLowerCase();
-    if (nama.includes("truk")) return TARIF_PARKIR.truk;
-    if (nama.includes("bus")) return TARIF_PARKIR.bus;
-    if (nama.includes("mobil")) return TARIF_PARKIR.mobil;
-    if (nama.includes("motor")) return TARIF_PARKIR.motor;
-    return 0;
-}
-
-function getTarif(item) {
-    const tarifJenis = Number(item?.tarif_jenis);
-    if (!isNaN(tarifJenis) && tarifJenis > 0) return tarifJenis;
-    return getTarifFallback(item?.nama_jenis);
-}
+// Perhitungan biaya SELALU dilakukan backend (services/tarifService.js)
+// dan ditampilkan lewat endpoint GET /parkir/:id/preview, supaya angka
+// di modal "Proses Kendaraan Keluar" sama persis dengan yang disimpan.
 
 function hitungDurasiText(waktuMasukStr, waktuKeluarLocalStr) {
     const masuk = new Date(String(waktuMasukStr).replace(" ", "T"));
@@ -88,7 +73,77 @@ let showKeluarModal = $state(false);
 let keluarItem = $state(null);
 let waktuKeluar = $state(toDatetimeLocal(new Date()));
 
-let tarifPreview = $derived(getTarif(keluarItem));
+let metodeBayar = $state("tunai");
+let uangDiterima = $state("");
+let previewData = $state(null);
+let previewError = $state("");
+let previewLoading = $state(false);
+let previewSeq = 0;
+
+let adaUangDiterima = $derived(
+    uangDiterima !== "" && uangDiterima !== null && uangDiterima !== undefined
+);
+let uangKurang = $derived(
+    metodeBayar === "tunai" &&
+    adaUangDiterima &&
+    previewData !== null &&
+    Number(uangDiterima) < previewData.biaya
+);
+
+async function loadPreview(id, waktuLocal) {
+
+    const seq = ++previewSeq;
+    previewLoading = true;
+
+    try {
+
+        const params = new URLSearchParams({
+            waktu_keluar: waktuLocal.replace("T", " ") + ":00"
+        });
+
+        const response = await apiFetch(`/parkir/${id}/preview?${params.toString()}`);
+
+        if (!response || seq !== previewSeq) return;
+
+        const data = await response.json();
+
+        if (seq !== previewSeq) return;
+
+        if (!response.ok) {
+            previewData = null;
+            previewError = data.message || "Gagal menghitung biaya";
+        } else {
+            previewData = data;
+            previewError = "";
+        }
+
+    } catch (err) {
+
+        if (seq === previewSeq) {
+            previewData = null;
+            previewError = "Gagal menghitung biaya";
+        }
+
+    } finally {
+
+        if (seq === previewSeq) previewLoading = false;
+
+    }
+
+}
+
+// Hitung ulang preview (dengan jeda singkat) tiap jam keluar diubah.
+$effect(() => {
+
+    if (!showKeluarModal || !keluarItem) return;
+
+    const id = keluarItem.id;
+    const waktu = waktuKeluar;
+    const timer = setTimeout(() => loadPreview(id, waktu), 250);
+
+    return () => clearTimeout(timer);
+
+});
 let durasiPreview = $derived(
     keluarItem
         ? hitungDurasiText(keluarItem.waktu_masuk, waktuKeluar)
@@ -99,6 +154,20 @@ let showDeleteModal = $state(false);
 let deleteId = $state(null);
 let deletePlat = $state("");
 
+// ===========================
+// QR TIKET
+// QR berisi kode_tiket (bukan seluruh data parkir) supaya ringan
+// discan dan tidak membocorkan data lain lewat kode QR.
+// ===========================
+let showQrModal = $state(false);
+let qrItem = $state(null);
+let qrDataUrlPreview = $state("");
+
+let showScanModal = $state(false);
+let scanError = $state("");
+let scanProcessing = $state(false);
+let scannerInstance = null;
+
 let toast = $state({
     show: false,
     message: "",
@@ -106,39 +175,29 @@ let toast = $state({
 });
 let loading = $state(true);
 
-function handleUnauthorized() {
-    logout();
-    showToast("Sesi berakhir, silakan login kembali", "error");
-    goto("/");
-}
-
-async function loadParkir() {
+async function loadParkir(page = currentPage) {
 
     loading = true;
 
     try {
 
-        const token = localStorage.getItem("token");
-
-        if (!token) {
-            handleUnauthorized();
-            return;
-        }
-
-        const response = await fetch(`${BASE_URL}/parkir`, {
-            headers: {
-                Authorization: `Bearer ${token}`
-            }
+        const params = new URLSearchParams({
+            page: String(page),
+            limit: String(pageLimit)
         });
 
-        if (response.status === 401) {
-            handleUnauthorized();
-            return;
-        }
+        if (search.trim()) params.set("q", search.trim());
+
+        const response = await apiFetch(`/parkir?${params.toString()}`);
+
+        if (!response) return;
 
         const data = await response.json();
 
-        parkir = [...data];
+        parkir = [...data.data];
+        currentPage = data.page;
+        totalPages = data.totalPages;
+        totalData = data.total;
 
     } catch (err) {
 
@@ -153,26 +212,40 @@ async function loadParkir() {
 
 }
 
+function handleSearchInput() {
+
+    clearTimeout(searchDebounce);
+
+    searchDebounce = setTimeout(() => {
+        loadParkir(1);
+    }, 350);
+
+}
+
+function gantiHalaman(page) {
+
+    if (page < 1 || page > totalPages || page === currentPage) return;
+    loadParkir(page);
+
+}
+
 async function loadKendaraanList() {
 
     try {
 
-        const token = localStorage.getItem("token");
+        // /kendaraan selalu membalas objek berpaginasi ({ data, total,
+        // page, ... }), bukan array polos, jadi hasilnya harus diambil
+        // dari data.data. limit=100 (maksimum yang diizinkan backend)
+        // dipakai supaya dropdown kendaraan di modal "Tambah Parkir"
+        // tetap memuat sebanyak mungkin kendaraan, bukan cuma 10 data
+        // pertama seperti default paginasi.
+        const response = await apiFetch("/kendaraan?limit=100");
 
-        const response = await fetch(`${BASE_URL}/kendaraan`, {
-            headers: {
-                Authorization: `Bearer ${token}`
-            }
-        });
-
-        if (response.status === 401) {
-            handleUnauthorized();
-            return;
-        }
+        if (!response) return;
 
         const data = await response.json();
 
-        kendaraanList = [...data];
+        kendaraanList = [...data.data];
 
     } catch (err) {
 
@@ -186,15 +259,12 @@ async function tambahParkir() {
 
     try {
 
-        const token = localStorage.getItem("token");
-
-        const response = await fetch(`${BASE_URL}/parkir`, {
+        const response = await apiFetch("/parkir", {
 
             method: "POST",
 
             headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`
+                "Content-Type": "application/json"
             },
 
             body: JSON.stringify({
@@ -204,10 +274,7 @@ async function tambahParkir() {
 
         });
 
-        if (response.status === 401) {
-            handleUnauthorized();
-            return;
-        }
+        if (!response) return;
 
         const data = await response.json();
 
@@ -226,6 +293,8 @@ async function tambahParkir() {
 
         await loadParkir();
 
+        cetakTiketBaru(data.kode_tiket);
+
     } catch (err) {
 
         console.error(err);
@@ -239,44 +308,57 @@ function bukaKeluar(item) {
 
     keluarItem = item;
     waktuKeluar = toDatetimeLocal(new Date());
+    metodeBayar = "tunai";
+    uangDiterima = "";
+    previewData = null;
+    previewError = "";
     showKeluarModal = true;
 
 }
 
 async function catatKeluar() {
 
+    if (previewError) {
+        showToast(previewError, "error");
+        return;
+    }
+
+    if (uangKurang) {
+        showToast("Uang diterima kurang dari total biaya", "error");
+        return;
+    }
+
     try {
 
-        const token = localStorage.getItem("token");
+        const response = await apiFetch(
 
-        const response = await fetch(
-
-            `${BASE_URL}/parkir/${keluarItem.id}`,
+            `/parkir/${keluarItem.id}`,
 
             {
 
                 method: "PUT",
 
                 headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`
+                    "Content-Type": "application/json"
                 },
 
                 // Biaya TIDAK dikirim dari frontend - tarif tetap
                 // dihitung & divalidasi otomatis oleh backend
                 // berdasarkan jenis kendaraan.
                 body: JSON.stringify({
-                    waktu_keluar: waktuKeluar.replace("T", " ") + ":00"
+                    waktu_keluar: waktuKeluar.replace("T", " ") + ":00",
+                    metode_bayar: metodeBayar,
+                    uang_diterima:
+                        metodeBayar === "tunai" && adaUangDiterima
+                            ? Number(uangDiterima)
+                            : null
                 })
 
             }
 
         );
 
-        if (response.status === 401) {
-            handleUnauthorized();
-            return;
-        }
+        if (!response) return;
 
         const data = await response.json();
 
@@ -287,6 +369,15 @@ async function catatKeluar() {
 
         }
 
+        // Data struk digabung dari baris yang dipilih + hasil perhitungan
+        // backend, dibuat sebelum keluarItem dikosongkan.
+        const itemStruk = {
+            ...keluarItem,
+            ...data.data,
+            nama_jenis: keluarItem.nama_jenis,
+            status: "Keluar"
+        };
+
         showKeluarModal = false;
         keluarItem = null;
 
@@ -295,6 +386,10 @@ async function catatKeluar() {
         );
 
         loadParkir();
+
+        if (autoCetak) {
+            cetakAsli(itemStruk, "struk");
+        }
 
     } catch (err) {
 
@@ -317,22 +412,14 @@ async function deleteParkir() {
 
     try {
 
-        const token = localStorage.getItem("token");
-
-        const response = await fetch(
-            `${BASE_URL}/parkir/${deleteId}`,
+        const response = await apiFetch(
+            `/parkir/${deleteId}`,
             {
-                method: "DELETE",
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
+                method: "DELETE"
             }
         );
 
-        if (response.status === 401) {
-            handleUnauthorized();
-            return;
-        }
+        if (!response) return;
 
         const data = await response.json();
 
@@ -366,8 +453,320 @@ function formatWaktu(value) {
 }
 
 function formatBiaya(value) {
-    if (!value) return "-";
+    if (value === null || value === undefined || value === "") return "-";
+    if (Number(value) === 0) return "Gratis";
     return "Rp" + Number(value).toLocaleString("id-ID");
+}
+
+// Nominal uang apa adanya (0 tetap "Rp0"), dipakai untuk kembalian.
+function formatUang(value) {
+    return "Rp" + Number(value || 0).toLocaleString("id-ID");
+}
+
+const LABEL_METODE = {
+    tunai: "Tunai",
+    qris: "QRIS",
+    transfer: "Transfer"
+};
+
+function simpanAutoCetak() {
+    localStorage.setItem("parkir_auto_cetak", autoCetak ? "1" : "0");
+}
+
+// ===========================
+// CETAK ASLI KE PRINTER (struk thermal), bukan unduh PDF.
+// Layout & cara kerjanya ada di services/cetakStruk.js.
+// ===========================
+async function cetakAsli(item, jenisDokumen) {
+
+    try {
+
+        const opsi = {};
+
+        if (jenisDokumen === "struk") {
+            opsi.durasi = item.durasi ||
+                hitungDurasiText(item.waktu_masuk, String(item.waktu_keluar).replace(" ", "T"));
+        }
+
+        await cetakStruk(item, jenisDokumen, opsi);
+
+    } catch (err) {
+
+        console.error(err);
+        showToast("Gagal mencetak ke printer", "error");
+
+    }
+
+}
+
+// Ambil data lengkap tiket yang baru dibuat lalu cetak otomatis.
+async function cetakTiketBaru(kodeTiket) {
+
+    if (!autoCetak || !kodeTiket) return;
+
+    try {
+
+        const response = await apiFetch(`/parkir/tiket/${encodeURIComponent(kodeTiket)}`);
+
+        if (!response) return;
+
+        const data = await response.json();
+
+        if (response.ok) {
+            await cetakAsli(data.data, "tiket");
+        }
+
+    } catch (err) {
+
+        console.error(err);
+
+    }
+
+}
+
+// Generate QR code (data URL PNG) dari sebuah teks. QR tiket parkir
+// cuma berisi kode_tiket-nya sendiri (bukan seluruh data parkir),
+// supaya ringan discan dan tidak membocorkan data lain lewat QR.
+async function buatQRDataUrl(text) {
+    const QRCode = (await import("qrcode")).default;
+    return await QRCode.toDataURL(text, {
+        margin: 1,
+        width: 240
+    });
+}
+
+// ===========================
+// CETAK TIKET (saat kendaraan masuk) & STRUK (saat kendaraan keluar)
+// Dibuat langsung di browser pakai jsPDF (sudah dipakai juga di
+// halaman Laporan untuk export PDF), jadi tidak perlu endpoint
+// backend tambahan. Khusus tiket masuk, QR kode_tiket ikut dicetak
+// supaya bisa discan langsung saat kendaraan keluar.
+// ===========================
+async function cetakDokumen(item, jenisDokumen) {
+
+    const { default: jsPDF } = await import("jspdf");
+
+    let qrDataUrl = null;
+
+    if (jenisDokumen === "tiket" && item.kode_tiket) {
+        try {
+            qrDataUrl = await buatQRDataUrl(item.kode_tiket);
+        } catch (err) {
+            console.error("Gagal membuat QR code:", err);
+        }
+    }
+
+    const doc = new jsPDF({
+        unit: "mm",
+        format: [80, jenisDokumen === "struk" ? 150 : (qrDataUrl ? 130 : 100)]
+    });
+
+    const lebar = 80;
+    let y = 10;
+
+    doc.setFontSize(13);
+    doc.setFont(undefined, "bold");
+    doc.text("SISTEM MANAJEMEN PARKIR", lebar / 2, y, { align: "center" });
+
+    y += 6;
+    doc.setFontSize(9);
+    doc.setFont(undefined, "normal");
+    doc.text(
+        jenisDokumen === "struk" ? "STRUK PEMBAYARAN PARKIR" : "TIKET MASUK PARKIR",
+        lebar / 2,
+        y,
+        { align: "center" }
+    );
+
+    y += 4;
+    doc.setLineWidth(0.2);
+    doc.line(5, y, lebar - 5, y);
+
+    y += 6;
+    doc.setFontSize(9);
+
+    const baris = (label, value) => {
+        doc.text(label, 6, y);
+        doc.text(String(value ?? "-"), lebar - 6, y, { align: "right" });
+        y += 6;
+    };
+
+    baris("Kode Tiket", item.kode_tiket || "-");
+    baris("Plat Nomor", item.plat_nomor);
+    if (item.warna) baris("Warna", item.warna);
+    baris("Pemilik", item.nama_pemilik);
+    baris("Jenis", item.nama_jenis);
+    baris("Jam Masuk", formatWaktu(item.waktu_masuk));
+
+    if (jenisDokumen === "struk") {
+        baris("Jam Keluar", formatWaktu(item.waktu_keluar));
+        baris("Durasi", hitungDurasiText(item.waktu_masuk, String(item.waktu_keluar).replace(" ", "T")));
+        doc.line(5, y, lebar - 5, y);
+        y += 6;
+        doc.setFont(undefined, "bold");
+        baris("TOTAL BAYAR", formatBiaya(item.biaya));
+        doc.setFont(undefined, "normal");
+
+        if (item.metode_bayar) {
+            baris("Metode Bayar", LABEL_METODE[item.metode_bayar] || item.metode_bayar);
+
+            if (item.metode_bayar === "tunai" && item.uang_diterima !== null && item.uang_diterima !== undefined) {
+                baris("Uang Diterima", formatUang(item.uang_diterima));
+                baris("Kembalian", formatUang(item.kembalian));
+            }
+        }
+
+        if (item.petugas_keluar) {
+            baris("Petugas", item.petugas_keluar);
+        }
+    }
+
+    if (jenisDokumen === "tiket" && qrDataUrl) {
+        y += 2;
+        const ukuranQr = 34;
+        doc.addImage(qrDataUrl, "PNG", (lebar - ukuranQr) / 2, y, ukuranQr, ukuranQr);
+        y += ukuranQr + 4;
+        doc.setFontSize(8);
+        doc.setFont(undefined, "normal");
+        doc.text("Scan QR ini saat kendaraan keluar", lebar / 2, y, { align: "center" });
+        y += 2;
+    }
+
+    y += 4;
+    doc.setLineWidth(0.2);
+    doc.line(5, y, lebar - 5, y);
+
+    y += 6;
+    doc.setFontSize(8);
+    doc.setFont(undefined, "italic");
+    doc.text(
+        jenisDokumen === "struk"
+            ? "Terima kasih, simpan struk ini sebagai bukti pembayaran."
+            : "Simpan tiket ini, tunjukkan saat kendaraan keluar.",
+        lebar / 2,
+        y,
+        { align: "center", maxWidth: lebar - 12 }
+    );
+
+    doc.save(`${jenisDokumen}-${item.kode_tiket || item.plat_nomor}.pdf`);
+
+}
+
+// ===========================
+// PREVIEW QR (tanpa perlu cetak PDF)
+// ===========================
+async function bukaQr(item) {
+
+    qrItem = item;
+    qrDataUrlPreview = "";
+    showQrModal = true;
+
+    try {
+        qrDataUrlPreview = await buatQRDataUrl(item.kode_tiket);
+    } catch (err) {
+        console.error("Gagal membuat QR code:", err);
+    }
+
+}
+
+function tutupQr() {
+    showQrModal = false;
+    qrItem = null;
+    qrDataUrlPreview = "";
+}
+
+// ===========================
+// SCAN QR (kendaraan keluar)
+// Pakai kamera device lewat library html5-qrcode. Hasil scan
+// (kode_tiket) dicocokkan ke backend, kalau ketemu & masih aktif
+// parkir, langsung buka modal proses keluar yang sudah ada -
+// petugas tidak perlu cari manual dari daftar/plat nomor.
+// ===========================
+async function bukaScan() {
+
+    scanError = "";
+    scanProcessing = false;
+    showScanModal = true;
+
+    // Tunggu modal (dan elemen #qr-reader di dalamnya) selesai
+    // dirender ke DOM sebelum kamera diinisialisasi.
+    await tick();
+
+    try {
+
+        const { Html5Qrcode } = await import("html5-qrcode");
+        scannerInstance = new Html5Qrcode("qr-reader");
+
+        await scannerInstance.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: 220 },
+            handleScanSuccess,
+            () => {} // callback error per-frame ("QR tidak terdeteksi di frame ini") - diabaikan
+        );
+
+    } catch (err) {
+
+        console.error("Gagal mengakses kamera:", err);
+        scanError = "Tidak bisa mengakses kamera. Pastikan izin kamera sudah diaktifkan di browser.";
+
+    }
+
+}
+
+async function handleScanSuccess(decodedText) {
+
+    if (scanProcessing) return;
+    scanProcessing = true;
+    scanError = "";
+
+    try {
+
+        const kodeTiket = String(decodedText || "").trim();
+
+        const response = await apiFetch(`/parkir/tiket/${encodeURIComponent(kodeTiket)}`);
+
+        if (!response) return;
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            scanError = data.message || "Tiket tidak ditemukan";
+            scanProcessing = false;
+            return;
+        }
+
+        await tutupScan();
+        bukaKeluar(data.data);
+
+    } catch (err) {
+
+        console.error(err);
+        scanError = "Terjadi kesalahan saat memproses hasil scan";
+        scanProcessing = false;
+
+    }
+
+}
+
+async function tutupScan() {
+
+    if (scannerInstance) {
+
+        try {
+            await scannerInstance.stop();
+            scannerInstance.clear();
+        } catch (err) {
+            console.error(err);
+        }
+
+        scannerInstance = null;
+
+    }
+
+    showScanModal = false;
+    scanError = "";
+    scanProcessing = false;
+
 }
 
 function showToast(message, type = "success") {
@@ -383,8 +782,15 @@ function showToast(message, type = "success") {
 }
 
 onMount(() => {
+    autoCetak = localStorage.getItem("parkir_auto_cetak") !== "0";
     loadKendaraanList();
     loadParkir();
+});
+
+onDestroy(() => {
+    if (scannerInstance) {
+        scannerInstance.stop().catch(() => {});
+    }
 });
 
 </script>
@@ -395,16 +801,31 @@ onMount(() => {
 
             <p class="total-data">
                 Total Data :
-                <b>{filteredParkir.length}</b>
+                <b>{totalData}</b>
             </p>
 
             <div class="toolbar">
 
-                <input
-                    type="text"
-                    bind:value={search}
-                    placeholder="🔍 Cari plat nomor / pemilik..."
-                />
+                <div class="toolbar-left">
+
+                    <input
+                        type="text"
+                        bind:value={search}
+                        oninput={handleSearchInput}
+                        placeholder="🔍 Cari plat nomor / pemilik..."
+                    />
+
+                    <button class="scan-btn" onclick={bukaScan}>
+                        <Camera size={16}/>
+                        Scan QR Keluar
+                    </button>
+
+                    <label class="auto-cetak" title="Tiket dicetak otomatis saat masuk, struk saat keluar">
+                        <input type="checkbox" bind:checked={autoCetak} onchange={simpanAutoCetak} />
+                        Cetak otomatis
+                    </label>
+
+                </div>
 
                 <button onclick={() => {
                     kendaraanId = "";
@@ -437,26 +858,27 @@ onMount(() => {
                         <th>Keluar</th>
                         <th>Status</th>
                         <th>Biaya</th>
+                        <th>Petugas</th>
                         <th>Aksi</th>
                     </tr>
                 </thead>
 
                 <tbody>
 
-                {#if filteredParkir.length === 0}
+                {#if parkir.length === 0}
 
                 <tr>
-                    <td colspan="9" class="empty">
+                    <td colspan="10" class="empty">
                         Data tidak ditemukan
                     </td>
                 </tr>
 
                 {:else}
 
-                {#each filteredParkir as item, index}
+                {#each parkir as item, index}
 
                 <tr class="row-anim" style="animation-delay:{index * 0.05}s">
-                    <td>{index + 1}</td>
+                    <td>{(currentPage - 1) * pageLimit + index + 1}</td>
                     <td>{item.plat_nomor}</td>
                     <td>{item.nama_pemilik}</td>
                     <td>{item.nama_jenis}</td>
@@ -469,11 +891,34 @@ onMount(() => {
                     </td>
                     <td>{formatBiaya(item.biaya)}</td>
                     <td>
+                        <div class="petugas-cell">
+                            <span title="Petugas masuk">&darr; {item.petugas_masuk || "-"}</span>
+                            {#if item.status !== "Parkir"}
+                                <span title="Petugas keluar">&uarr; {item.petugas_keluar || "-"}</span>
+                            {/if}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="row-actions">
 
                         {#if item.status === "Parkir"}
                             <button class="keluar" onclick={() => bukaKeluar(item)}>
                                 <LogOut size={16}/>
                                 Keluar
+                            </button>
+                            <button class="cetak" onclick={() => cetakAsli(item, "tiket")}>
+                                Cetak Tiket
+                            </button>
+                            <button class="qr-btn" onclick={() => bukaQr(item)}>
+                                <QrCode size={16}/>
+                                QR
+                            </button>
+                        {:else}
+                            <button class="cetak" onclick={() => cetakAsli(item, "struk")}>
+                                Cetak Struk
+                            </button>
+                            <button class="cetak pdf" onclick={() => cetakDokumen(item, "struk")}>
+                                PDF
                             </button>
                         {/if}
 
@@ -482,6 +927,7 @@ onMount(() => {
                             Delete
                         </button>
 
+                        </div>
                     </td>
                 </tr>
 
@@ -492,6 +938,18 @@ onMount(() => {
                 </tbody>
 
             </table>
+
+            {#if totalPages > 1}
+                <div class="pagination">
+                    <button onclick={() => gantiHalaman(currentPage - 1)} disabled={currentPage === 1}>
+                        &laquo; Sebelumnya
+                    </button>
+                    <span class="page-info">Halaman {currentPage} dari {totalPages}</span>
+                    <button onclick={() => gantiHalaman(currentPage + 1)} disabled={currentPage === totalPages}>
+                        Berikutnya &raquo;
+                    </button>
+                </div>
+            {/if}
 
             {#if showDeleteModal}
 
@@ -603,17 +1061,19 @@ onMount(() => {
 
                         <div class="detail-row">
                             <span>Durasi</span>
-                            <b>{durasiPreview}</b>
+                            <b>{previewData?.durasi ?? durasiPreview}</b>
                         </div>
 
-                        <div class="detail-row">
-                            <span>Tarif Tetap</span>
-                            <b>{formatBiaya(tarifPreview)}</b>
-                        </div>
+                        {#if previewData?.gratis}
+                            <div class="detail-row">
+                                <span>Keterangan</span>
+                                <b>Masih dalam masa gratis</b>
+                            </div>
+                        {/if}
 
                         <div class="detail-row total">
                             <span>Total Biaya</span>
-                            <b>{formatBiaya(tarifPreview)}</b>
+                            <b>{previewError ? "-" : formatBiaya(previewData?.biaya)}</b>
                         </div>
 
                     </div>
@@ -622,6 +1082,45 @@ onMount(() => {
                         type="datetime-local"
                         bind:value={waktuKeluar}
                     />
+
+                    {#if previewError}
+                        <p class="preview-error">{previewError}</p>
+                    {/if}
+
+                    {#if previewData && previewData.biaya > 0}
+
+                        <label class="field-label" for="metode-bayar">Metode Pembayaran</label>
+                        <select id="metode-bayar" bind:value={metodeBayar}>
+                            <option value="tunai">Tunai</option>
+                            <option value="qris">QRIS</option>
+                            <option value="transfer">Transfer</option>
+                        </select>
+
+                        {#if metodeBayar === "tunai"}
+
+                            <input
+                                type="number"
+                                min="0"
+                                step="1000"
+                                bind:value={uangDiterima}
+                                placeholder="Uang diterima (Rp) - opsional"
+                            />
+
+                            {#if adaUangDiterima}
+                                {#if uangKurang}
+                                    <div class="kembalian kurang">
+                                        Uang diterima kurang {formatUang(previewData.biaya - Number(uangDiterima))}
+                                    </div>
+                                {:else}
+                                    <div class="kembalian">
+                                        Kembalian: <b>{formatUang(Number(uangDiterima) - previewData.biaya)}</b>
+                                    </div>
+                                {/if}
+                            {/if}
+
+                        {/if}
+
+                    {/if}
 
                     <div class="action">
 
@@ -632,8 +1131,86 @@ onMount(() => {
                             Batal
                         </button>
 
-                        <button class="save" onclick={catatKeluar}>
+                        <button
+                            class="save"
+                            onclick={catatKeluar}
+                            disabled={previewLoading || !!previewError || !previewData || uangKurang}
+                        >
                             Proses Kendaraan Keluar
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            {/if}
+
+            {#if showQrModal && qrItem}
+
+            <div class="modal">
+
+                <div class="modal-content qr-modal">
+
+                    <h2>Tiket Parkir</h2>
+
+                    <p class="qr-caption">
+                        {qrItem.plat_nomor} — {qrItem.kode_tiket || "-"}
+                    </p>
+
+                    {#if qrDataUrlPreview}
+                        <img src={qrDataUrlPreview} alt="QR Tiket {qrItem.kode_tiket}" class="qr-preview" />
+                    {:else}
+                        <p class="qr-loading">Membuat QR...</p>
+                    {/if}
+
+                    <p class="qr-hint">Tunjukkan/scan QR ini saat kendaraan keluar.</p>
+
+                    <div class="action">
+
+                        <button class="cancel" onclick={tutupQr}>
+                            Tutup
+                        </button>
+
+                        <button class="pdf-btn" onclick={() => cetakDokumen(qrItem, "tiket")}>
+                            Unduh PDF
+                        </button>
+
+                        <button class="save" onclick={() => cetakAsli(qrItem, "tiket")}>
+                            Cetak
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            {/if}
+
+            {#if showScanModal}
+
+            <div class="modal">
+
+                <div class="modal-content">
+
+                    <h2>📷 Scan QR Tiket</h2>
+
+                    <div id="qr-reader" class="qr-reader-box"></div>
+
+                    {#if scanProcessing}
+                        <p class="qr-hint">Memproses hasil scan...</p>
+                    {/if}
+
+                    {#if scanError}
+                        <p class="hint-empty">{scanError}</p>
+                    {/if}
+
+                    <div class="action">
+
+                        <button class="cancel" onclick={tutupScan}>
+                            Tutup
                         </button>
 
                     </div>
@@ -771,6 +1348,106 @@ tr:hover{
     background:#c2410c;
 }
 
+.cetak{
+    background:#0f172a;
+    color:white;
+    margin-right:8px;
+}
+
+.cetak:hover{
+    background:#1e293b;
+}
+
+.qr-btn{
+    background:#7c3aed;
+    color:white;
+    margin-right:8px;
+}
+
+.qr-btn:hover{
+    background:#6d28d9;
+}
+
+.scan-btn{
+    background:#0f172a;
+}
+
+.auto-cetak{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-size:13px;
+    color:#475569;
+    white-space:nowrap;
+    cursor:pointer;
+}
+
+.toolbar .auto-cetak input[type="checkbox"]{
+    width:auto;
+    padding:0;
+    margin:0;
+}
+
+.cetak.pdf,
+.pdf-btn{
+    background:#64748b;
+}
+
+.scan-btn:hover{
+    background:#1e293b;
+}
+
+.qr-modal{
+    text-align:center;
+}
+
+.qr-caption{
+    color:#334155;
+    font-weight:600;
+    margin-top:6px;
+}
+
+.qr-preview{
+    width:200px;
+    height:200px;
+    margin:16px auto;
+    display:block;
+    border-radius:12px;
+    border:1px solid #e2e8f0;
+    padding:10px;
+}
+
+.qr-loading{
+    padding:60px 0;
+    color:#94a3b8;
+}
+
+.qr-hint{
+    color:#64748b;
+    font-size:13px;
+}
+
+.qr-reader-box{
+    margin-top:16px;
+    border-radius:12px;
+    overflow:hidden;
+    min-height:250px;
+    background:#0f172a;
+}
+
+.row-actions{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+}
+
+.row-actions button{
+    margin-right:0;
+    padding:8px 12px;
+    font-size:13px;
+    white-space:nowrap;
+}
+
 .delete{
     background:#dc2626;
     color:white;
@@ -879,6 +1556,51 @@ tr:hover{
     background:#64748b;
 }
 
+.save:disabled{
+    opacity: .5;
+    cursor: not-allowed;
+}
+
+.field-label{
+    display: block;
+    margin: 10px 0 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #475569;
+}
+
+.preview-error{
+    margin: 8px 0 0;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: #fef2f2;
+    color: #b91c1c;
+    font-size: 13px;
+}
+
+.kembalian{
+    margin-top: 6px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: #f0fdf4;
+    color: #166534;
+    font-size: 14px;
+}
+
+.kembalian.kurang{
+    background: #fef2f2;
+    color: #b91c1c;
+}
+
+.petugas-cell{
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 12px;
+    color: #475569;
+    white-space: nowrap;
+}
+
 .save{
     background:#16a34a;
 }
@@ -960,12 +1682,53 @@ tr:hover{
     }
 }
 
+.pagination{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:16px;
+    margin-top:18px;
+}
+
+.pagination button{
+    padding:8px 16px;
+    border:1px solid #dbe3ef;
+    background:white;
+    border-radius:8px;
+    cursor:pointer;
+    font-size:14px;
+    color:#334155;
+    transition:.2s;
+}
+
+.pagination button:hover:not(:disabled){
+    background:#2563eb;
+    color:white;
+    border-color:#2563eb;
+}
+
+.pagination button:disabled{
+    opacity:.5;
+    cursor:not-allowed;
+}
+
+.page-info{
+    font-size:14px;
+    color:#64748b;
+}
+
 .toolbar{
     display:flex;
     justify-content:space-between;
     align-items:center;
     margin-bottom:20px;
     gap:20px;
+}
+
+.toolbar-left{
+    display:flex;
+    align-items:center;
+    gap:12px;
 }
 
 .toolbar input{

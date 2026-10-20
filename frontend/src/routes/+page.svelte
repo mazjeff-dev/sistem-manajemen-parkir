@@ -1,9 +1,13 @@
 <script>
     import BASE_URL from "../services/api.js";
-    import { saveToken } from "../stores/auth.js";
+    import { saveSession } from "../stores/auth.js";
     import { goto } from "$app/navigation";
 
-    import { Mail, Lock, LoaderCircle, SquareParking, X } from "lucide-svelte";
+    import Mail from "lucide-svelte/icons/mail";
+    import Lock from "lucide-svelte/icons/lock";
+    import LoaderCircle from "lucide-svelte/icons/loader-circle";
+    import SquareParking from "lucide-svelte/icons/square-parking";
+    import X from "lucide-svelte/icons/x";
 
     let email = $state("");
     let password = $state("");
@@ -52,7 +56,12 @@
 
             }
 
-            saveToken(data.token);
+            saveSession({
+                token: data.token,
+                refreshToken: data.refreshToken,
+                role: data.role,
+                nama: data.nama
+            });
 
             goto("/dashboard");
 
@@ -154,6 +163,10 @@
 
             <p class="register-link">
                 Belum punya akun? <a href="/register">Daftar di sini</a>
+            </p>
+
+            <p class="register-link">
+                <a href="/forgot-password">Lupa password?</a>
             </p>
 
             <p class="footer">

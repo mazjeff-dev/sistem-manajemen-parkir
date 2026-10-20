@@ -1,18 +1,18 @@
 <script>
     import { goto } from "$app/navigation";
     import { page } from "$app/state";
-    import { logout as authLogout } from "../stores/auth.js";
-    import {
-        LayoutDashboard,
-        Car,
-        CarFront,
-        SquareParking,
-        FileText,
-        UserCircle2,
-        LogOut,
-        ChevronLeft,
-        ChevronRight
-    } from "lucide-svelte";
+    import { logout as authLogout, role, nama } from "../stores/auth.js";
+    import LayoutDashboard from "lucide-svelte/icons/layout-dashboard";
+    import Car from "lucide-svelte/icons/car";
+    import CarFront from "lucide-svelte/icons/car-front";
+    import SquareParking from "lucide-svelte/icons/square-parking";
+    import FileText from "lucide-svelte/icons/file-text";
+    import UserCircle2 from "lucide-svelte/icons/user-circle-2";
+    import Users from "lucide-svelte/icons/users";
+    import ScrollText from "lucide-svelte/icons/scroll-text";
+    import LogOut from "lucide-svelte/icons/log-out";
+    import ChevronLeft from "lucide-svelte/icons/chevron-left";
+    import ChevronRight from "lucide-svelte/icons/chevron-right";
 
     let collapsed = $state(
         typeof localStorage !== "undefined" &&
@@ -32,14 +32,24 @@
         goto("/");
     }
 
-    const menu = [
+    // Menu "Jenis Kendaraan" (kelola tarif & kapasitas slot) dibatasi
+    // khusus admin, sesuai proteksi role di backend (jenisRoutes.js).
+    // Petugas tetap bisa melihat daftar jenis lewat dropdown form
+    // kendaraan/parkir, hanya tidak bisa mengubah konfigurasinya.
+    const menuFull = [
         { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
-        { label: "Jenis Kendaraan", icon: Car, path: "/jenis" },
+        { label: "Jenis Kendaraan", icon: Car, path: "/jenis", adminOnly: true },
         { label: "Kendaraan", icon: CarFront, path: "/kendaraan" },
         { label: "Parkir", icon: SquareParking, path: "/parkir" },
         { label: "Laporan", icon: FileText, path: "/laporan" },
+        { label: "Kelola User", icon: Users, path: "/admin/users", adminOnly: true },
+        { label: "Audit Log", icon: ScrollText, path: "/admin/audit", adminOnly: true },
         { label: "Profil", icon: UserCircle2, path: "/profile" }
     ];
+
+    let menu = $derived(
+        menuFull.filter((item) => !item.adminOnly || $role === "admin")
+    );
 
     let currentPath = $derived(page.url.pathname);
 </script>
@@ -103,6 +113,12 @@
     </nav>
 
     <div class="p-3">
+
+        {#if !collapsed && $nama}
+            <div class="px-2 pb-3 text-xs text-slate-400 truncate">
+                {$nama} <span class="text-slate-500">&middot; {$role === "admin" ? "Admin" : "Petugas"}</span>
+            </div>
+        {/if}
 
         <button
             onclick={logout}

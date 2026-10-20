@@ -2,7 +2,11 @@
     import BASE_URL from "../../services/api.js";
     import { goto } from "$app/navigation";
 
-    import { Mail, Lock, User, LoaderCircle, SquareParking } from "lucide-svelte";
+    import Mail from "lucide-svelte/icons/mail";
+    import Lock from "lucide-svelte/icons/lock";
+    import User from "lucide-svelte/icons/user";
+    import LoaderCircle from "lucide-svelte/icons/loader-circle";
+    import SquareParking from "lucide-svelte/icons/square-parking";
 
     let nama = $state("");
     let email = $state("");
@@ -91,6 +95,10 @@
 
             <p class="subtitle">
                 Daftar untuk mengakses Sistem Manajemen Parkir
+            </p>
+
+            <p class="role-note">
+                Catatan: akun pertama yang mendaftar di sistem otomatis menjadi <b>Admin</b>. Akun berikutnya otomatis menjadi <b>Petugas</b>.
             </p>
 
             <form onsubmit={handleSubmit}>
@@ -281,7 +289,17 @@ h1{
     text-align:center;
     color:#64748b;
     margin-top:8px;
-    margin-bottom:30px;
+    margin-bottom:14px;
+}
+
+.role-note{
+    text-align:center;
+    color:#2563eb;
+    background:#eff6ff;
+    border-radius:10px;
+    padding:10px 12px;
+    font-size:12.5px;
+    margin-bottom:22px;
 }
 
 .input-group{

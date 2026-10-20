@@ -13,4 +13,7 @@ router.get("/analytics", verifyToken, dashboardController.analytics);
 // Dashboard Pendapatan (revenue hari ini/bulan ini/tahun ini)
 router.get("/revenue", verifyToken, dashboardController.revenue);
 
+// Dashboard Kapasitas/Slot Parkir per jenis kendaraan
+router.get("/slots", verifyToken, dashboardController.slots);
+
 module.exports = router;

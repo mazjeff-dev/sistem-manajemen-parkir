@@ -14,6 +14,8 @@ const parkirRoutes = require("./routes/parkirRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const laporanRoutes = require("./routes/laporanRoutes");
 const profileRoutes = require("./routes/profileRoutes");
+const adminRoutes = require("./routes/adminRoutes");
+const anprRoutes = require("./routes/anprRoutes");
 
 app.use(cors());
 app.use(express.json());
@@ -29,6 +31,8 @@ app.use("/api/parkir", parkirRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/laporan", laporanRoutes);
 app.use("/api/profile", profileRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/anpr", anprRoutes);
 
 app.get("/", (req, res) => {
     res.send("API Sistem Manajemen Parkir Berjalan");
